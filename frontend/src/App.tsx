@@ -28,21 +28,33 @@ function App() {
   const { query, setQuery, topK, setTopK, results, isSearching, runSearch } = useSearch();
   const {
     activeFrame,
+    canLoadMoreLeft,
+    canLoadMoreRight,
     chatDuration,
     chatQuery,
     chatResponse,
     closeViewer,
     frames,
+    isExtendingLeft,
+    isExtendingRight,
     isChatting,
+    isFrameInVlmWindow,
     isLoadingFrames,
     isOpen,
+    loadMoreLeft,
+    loadMoreRight,
     openViewer,
     runChat,
+    selectNextFrame,
+    selectPreviousFrame,
+    selectedFrameIndex,
     selectedResult,
     selectedTimestampNs,
     setChatDuration,
     setChatQuery,
     setSelectedTimestampNs,
+    vlmWindowEndNs,
+    vlmWindowStartNs,
   } = useSequenceViewer();
 
   return (
@@ -91,20 +103,32 @@ function App() {
       <ResultsGrid results={results} isSearching={isSearching} onResultClick={openViewer} />
       <SequenceViewer
         activeFrame={activeFrame}
+        canLoadMoreLeft={canLoadMoreLeft}
+        canLoadMoreRight={canLoadMoreRight}
         chatDuration={chatDuration}
         chatQuery={chatQuery}
         chatResponse={chatResponse}
         frames={frames}
+        isExtendingLeft={isExtendingLeft}
+        isExtendingRight={isExtendingRight}
         isChatting={isChatting}
+        isFrameInVlmWindow={isFrameInVlmWindow}
         isLoadingFrames={isLoadingFrames}
         isOpen={isOpen}
         onChat={runChat}
         onChatDurationChange={setChatDuration}
         onChatQueryChange={setChatQuery}
         onClose={closeViewer}
+        onLoadMoreLeft={loadMoreLeft}
+        onLoadMoreRight={loadMoreRight}
+        onSelectNextFrame={selectNextFrame}
+        onSelectPreviousFrame={selectPreviousFrame}
         onSelectTimestamp={setSelectedTimestampNs}
         result={selectedResult}
+        selectedFrameIndex={selectedFrameIndex}
         selectedTimestampNs={selectedTimestampNs}
+        vlmWindowEndNs={vlmWindowEndNs}
+        vlmWindowStartNs={vlmWindowStartNs}
       />
     </MainLayout>
   );
