@@ -6,9 +6,10 @@ import { Skeleton } from "../ui/skeleton";
 interface ResultsGridProps {
   results: SearchResult[];
   isSearching: boolean;
+  onResultClick?: (result: SearchResult) => void;
 }
 
-export function ResultsGrid({ results, isSearching }: ResultsGridProps) {
+export function ResultsGrid({ results, isSearching, onResultClick }: ResultsGridProps) {
   if (isSearching) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -30,7 +31,12 @@ export function ResultsGrid({ results, isSearching }: ResultsGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {results.map((result) => (
-        <ImageCard key={`${result.file_path}:${result.timestamp_ns}`} result={result} imageUrl={getImageUrl(result.file_path)} />
+        <ImageCard
+          key={`${result.file_path}:${result.timestamp_ns}`}
+          result={result}
+          imageUrl={getImageUrl(result.file_path)}
+          onClick={onResultClick ? () => onResultClick(result) : undefined}
+        />
       ))}
     </div>
   );

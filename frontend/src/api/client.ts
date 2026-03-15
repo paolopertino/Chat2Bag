@@ -1,5 +1,7 @@
 import type {
+  ChatResponse,
   BagStatusResponse,
+  FramesResponse,
   ScanBagsResponse,
   SearchResponse,
 } from "./types";
@@ -12,6 +14,13 @@ interface SearchRequest {
 
 interface IndexRequest {
   bag_path: string;
+}
+
+interface ChatRequest {
+  bag_path: string;
+  start_ns: number;
+  duration: number;
+  query: string;
 }
 
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
@@ -58,8 +67,28 @@ export async function getBagStatus(bagPath: string): Promise<BagStatusResponse> 
   return http<BagStatusResponse>(`/api/bags/status?bag_path=${encodeURIComponent(bagPath)}`);
 }
 
+export async function getFrames(
+  bagPath: string,
+  startNs: number,
+  durationSec: number,
+): Promise<FramesResponse> {
+  const params = new URLSearchParams({
+    bag_path: bagPath,
+    start_ns: String(startNs),
+    duration_sec: String(durationSec),
+  });
+  return http<FramesResponse>(`/api/bags/frames?${params.toString()}`);
+}
+
 export async function search(payload: SearchRequest): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function chatWithClip(payload: ChatRequest): Promise<ChatResponse> {
+  return http<ChatResponse>("/api/chat", {
     method: "POST",
     body: JSON.stringify(payload),
   });

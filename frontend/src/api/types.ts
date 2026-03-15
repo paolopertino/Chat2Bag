@@ -18,6 +18,7 @@ export interface BagStatusResponse {
 }
 
 export interface SearchResult {
+  bag_path: string;
   timestamp_ns: number;
   file_path: string;
   topic: string;
@@ -28,4 +29,18 @@ export interface SearchResult {
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
+}
+
+export interface FrameInfo {
+  timestamp_ns: number;
+  file_path: string;
+}
+
+export interface FramesResponse {
+  bag_path: string;
+  frames: FrameInfo[];
+}
+
+export interface ChatResponse {
+  response: string;
 }

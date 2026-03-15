@@ -4,8 +4,10 @@ import { toast } from "sonner";
 import { getBagStatus, indexBag, scanBags } from "../api/client";
 import type { BagInfo } from "../api/types";
 
+const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
+
 export function useBags() {
-  const [rootDir, setRootDir] = useState("");
+  const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
   const [bags, setBags] = useState<BagInfo[]>([]);
   const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -46,6 +48,15 @@ export function useBags() {
       return [...prev, bagPath];
     });
   }, []);
+
+  const toggleAllBags = useCallback(() => {
+    setSelectedBagPaths((prev) => {
+      if (prev.length === bags.length) {
+        return [];
+      }
+      return bags.map((bag) => bag.bag_path);
+    });
+  }, [bags]);
 
   const onIndex = useCallback(async (bagPath: string) => {
     try {
@@ -92,6 +103,10 @@ export function useBags() {
     return () => window.clearInterval(interval);
   }, [indexingBagPaths]);
 
+  useEffect(() => {
+    window.localStorage.setItem(ROOT_DIR_STORAGE_KEY, rootDir);
+  }, [rootDir]);
+
   return {
     rootDir,
     setRootDir,
@@ -102,5 +117,6 @@ export function useBags() {
     onScan,
     onIndex,
     toggleBagSelection,
+    toggleAllBags,
   };
 }

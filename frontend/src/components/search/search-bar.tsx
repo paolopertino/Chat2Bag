@@ -28,6 +28,12 @@ export function SearchBar({
         <Input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onSearch();
+            }
+          }}
           placeholder="Try: a red car, a bus, crosswalk with pedestrians..."
           className="h-11 text-base"
         />

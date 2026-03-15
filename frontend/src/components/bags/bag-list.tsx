@@ -9,6 +9,7 @@ interface BagListProps {
   bags: BagInfo[];
   selectedBagPaths: string[];
   onToggleBag: (bagPath: string) => void;
+  onToggleAllBags: () => void;
   onIndex: (bagPath: string) => void;
 }
 
@@ -16,7 +17,7 @@ function statusToVariant(status: BagStatus): "idle" | "indexing" | "done" | "err
   return status;
 }
 
-export function BagList({ bags, selectedBagPaths, onToggleBag, onIndex }: BagListProps) {
+export function BagList({ bags, selectedBagPaths, onToggleBag, onToggleAllBags, onIndex }: BagListProps) {
   if (bags.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--ink-soft)]">
@@ -25,8 +26,17 @@ export function BagList({ bags, selectedBagPaths, onToggleBag, onIndex }: BagLis
     );
   }
 
+  const allSelected = selectedBagPaths.length === bags.length;
+
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
+        <p className="text-[var(--ink-soft)]">{selectedBagPaths.length} of {bags.length} selected</p>
+        <Button size="sm" variant="ghost" onClick={onToggleAllBags}>
+          {allSelected ? "Deselect all" : "Select all"}
+        </Button>
+      </div>
+
       {bags.map((bag) => {
         const checked = selectedBagPaths.includes(bag.bag_path);
         const isIndexing = bag.status === "indexing";
