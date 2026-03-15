@@ -1,0 +1,88 @@
+import json
+import logging
+import yaml
+
+from pathlib import Path
+
+import cv2
+
+from rosbags.rosbag2 import Reader
+from rosbags.typesys import get_typestore, Stores
+from rosbags.image import message_to_cvimage
+
+logger = logging.getLogger(__name__)
+
+class BagParser:
+    def __init__(self, bag_path: str, config_path: str = "config/settings.yaml"):
+        self.bag_path = Path(bag_path)
+        
+        # Load settings
+        with open(config_path, "r") as f:
+            self.config = yaml.safe_load(f)
+            
+        self.topic = self.config["ingestion"]["camera_topic"]
+        self.fps = self.config["ingestion"]["sampling_fps"]
+        self.max_size = tuple(self.config["ingestion"]["max_image_size"])
+        
+        # Set up the artifact directories
+        self.artifact_dir = self.bag_path / self.config["storage"]["artifact_dir"]
+        self.thumbnail_dir = self.artifact_dir / "thumbnails"
+        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
+        self.typestore = get_typestore(Stores.LATEST)
+
+    def extract_frames(self):
+        """Reads the bag and extracts downsampled frames to the artifact folder."""
+        logger.info("Opening bag: %s", self.bag_path.name)
+        
+        metadata = {
+            "bag_name": self.bag_path.name,
+            "topic": self.topic,
+            "frames": []
+        }
+
+        # Calculate the nanosecond interval based on desired FPS
+        interval_ns = int((1.0 / self.fps) * 1e9)
+        last_saved_ns = 0
+        saved_count = 0
+
+        with Reader(self.bag_path) as reader:
+            connections = [x for x in reader.connections if x.topic == self.topic]
+            if not connections:
+                raise ValueError(f"Topic {self.topic} not found in {self.bag_path.name}")
+
+            logger.info("Extracting frames at %s FPS. This might take a moment...", self.fps)
+            
+            for connection, timestamp_ns, rawdata in reader.messages(connections=connections):
+                if (timestamp_ns - last_saved_ns) >= interval_ns:
+                    msg = self.typestore.deserialize_cdr(rawdata, connection.msgtype)
+                    
+                    cv_img = message_to_cvimage(msg, 'bgr8')
+                    
+                    # Resize to save space and VRAM
+                    cv_img_resized = cv2.resize(cv_img, self.max_size, interpolation=cv2.INTER_AREA)
+                    
+                    frame_filename = f"frame_{timestamp_ns}.jpg"
+                    frame_path = self.thumbnail_dir / frame_filename
+                    cv2.imwrite(str(frame_path), cv_img_resized)
+                    
+                    metadata["frames"].append({
+                        "timestamp_ns": timestamp_ns,
+                        "file_path": str(frame_path.resolve())
+                    })
+                    
+                    last_saved_ns = timestamp_ns
+                    saved_count += 1
+
+        # Write the metadata mapping file
+        metadata_path = self.artifact_dir / "metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=4)
+
+        logger.info("Extraction complete! Saved %s frames to %s", saved_count, self.thumbnail_dir)
+        return metadata_path
+
+if __name__ == "__main__":
+    example_path = "/home/paolopertino/adehome/aida_code/bags/2025-11-05_19-00_normal" # "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
+    parser = BagParser(example_path)
+    parser.extract_frames()

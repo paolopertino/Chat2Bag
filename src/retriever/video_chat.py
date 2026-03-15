@@ -1,0 +1,96 @@
+import json
+import logging
+import yaml
+
+from pathlib import Path
+
+import ollama
+
+logger = logging.getLogger(__name__)
+
+
+class VideoChat:
+    def __init__(self, bag_path: str, config_path: str = "config/settings.yaml"):
+        self.bag_path = Path(bag_path)
+
+        with open(config_path, "r") as f:
+            self.config = yaml.safe_load(f)
+
+        self.model_name = self.config["models"]["video_vlm"]
+        self.artifact_dir = self.bag_path / self.config["storage"]["artifact_dir"]
+        self.metadata_path = self.artifact_dir / "metadata.json"
+
+        if not self.metadata_path.exists():
+            raise FileNotFoundError("Metadata not found. Run indexer first.")
+
+    def chat_with_clip(
+        self,
+        start_timestamp_ns: int,
+        duration_sec: int,
+        query: str,
+        max_frames: int = 8,
+    ):
+        """Fetches a temporal window of frames and chats with them via Ollama."""
+        logger.info("Loading metadata to find frames for a %ss window...", duration_sec)
+
+        with open(self.metadata_path, "r") as f:
+            metadata = json.load(f)
+
+        duration_ns = int(duration_sec * 1e9)
+        end_timestamp_ns = start_timestamp_ns + duration_ns
+
+        # Filter frames within the time window
+        window_frames = [
+            f
+            for f in metadata["frames"]
+            if start_timestamp_ns <= f["timestamp_ns"] <= end_timestamp_ns
+        ]
+
+        if not window_frames:
+            logger.warning("No frames found in that time window.")
+            return
+
+        # Subsampling if we have more frames than max_frames to avoid overloading GPU memory.
+        # If we have 20 frames, and max_frames is 8, we take every ~2nd or 3rd frame
+        step = max(1, len(window_frames) // max_frames)
+        sampled_frames = window_frames[::step][:max_frames]
+
+        image_paths = [f["file_path"] for f in sampled_frames]
+        logger.info("Selected %s frames for the deep dive.", len(image_paths))
+
+        logger.info(
+            "Loading %s into VRAM via Ollama and analyzing sequence...", self.model_name
+        )
+
+        response = ollama.chat(
+            model=self.model_name,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"These images represent a sequential video of a driving scene. {query}",
+                    "images": image_paths,
+                }
+            ],
+            keep_alive=0,
+        )
+
+        logger.info("\n--- VLM Analysis ---")
+        logger.info(response["message"]["content"])
+        return response["message"]["content"]
+
+
+if __name__ == "__main__":
+    example_path = (
+        "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
+    )
+    chat = VideoChat(example_path)
+
+    # Example: User selected a timestamp from the search results, wants to see the next 10 seconds
+    # Make sure to replace start_ns with a real timestamp from your test run
+    start_ns = 1740734312724935438
+    chat.chat_with_clip(
+        start_timestamp_ns=start_ns,
+        duration_sec=10,
+        query="Is the car passing with a red light?",
+        max_frames=20,
+    )

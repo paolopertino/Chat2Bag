@@ -1,0 +1,15 @@
+ingestion:
+  camera_topic: "/lucid_vision/lucid_cam_front_center/image_rect/compressed"
+  # Subsampling rate: 1.0 means 1 frame per second.
+  sampling_fps: 1.0 
+  max_image_size: [512, 512]
+  batch_size: 8
+
+storage:
+  # The name of the hidden artifact folder created next to the .mcap files
+  artifact_dir: ".bag_chat"
+
+models:
+  embedding_model: "google/siglip2-base-patch16-naflex"
+  orchestration_llm: "gemma-2-9b"
+  video_vlm: "qwen3-vl:2b" # "qwen3-vl:4b"
