@@ -14,6 +14,28 @@ def _is_bag_dir(path: Path) -> bool:
     return any(child.is_file() and child.suffix == ".mcap" for child in path.iterdir())
 
 
+def _find_bag_dirs_recursive(root: Path) -> List[Path]:
+    bag_dirs: List[Path] = []
+
+    try:
+        for item in root.iterdir():
+            # Skip generated artifacts to avoid unnecessary traversal.
+            if item.is_dir() and item.name == ".bag_chat":
+                continue
+
+            try:
+                if _is_bag_dir(item):
+                    bag_dirs.append(item)
+                elif item.is_dir():
+                    bag_dirs.extend(_find_bag_dirs_recursive(item))
+            except (PermissionError, OSError):
+                continue
+    except (PermissionError, OSError):
+        return bag_dirs
+
+    return bag_dirs
+
+
 @router.get("/scan")
 async def scan_bags(root_dir: str = Query(..., description="Root directory containing bag folders")):
     root_path = Path(root_dir).expanduser().resolve()
@@ -21,9 +43,8 @@ async def scan_bags(root_dir: str = Query(..., description="Root directory conta
         raise HTTPException(status_code=400, detail="root_dir must be an existing directory")
 
     bags: List[Dict[str, Any]] = []
-    for candidate in sorted(root_path.iterdir()):
-        if not _is_bag_dir(candidate):
-            continue
+    bag_dirs = sorted(_find_bag_dirs_recursive(root_path), key=lambda p: str(p.resolve()))
+    for candidate in bag_dirs:
 
         lancedb_dir = candidate / ".bag_chat" / "lancedb"
         bag_path = str(candidate.resolve())
