@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  /* Project design tokens */
   --bg-sand: #faf6ed;
   --bg-paper: #fffdf9;
   --line: #dfd2bd;
@@ -12,6 +13,29 @@
   --ink-soft: #50483f;
   --coral: #f26a4b;
   --teal: #2d7f85;
+
+  /* shadcn semantic tokens — mapped to project design identity.
+     Values are raw HSL channels (no hsl() wrapper; Tailwind adds it). */
+  --background: 42 50% 97%;        /* ≈ #faf6ed  (bg-sand)   */
+  --foreground: 210 11% 7%;        /* ≈ #111315  (ink)        */
+  --card: 40 100% 99%;             /* ≈ #fffdf9  (bg-paper)   */
+  --card-foreground: 210 11% 7%;
+  --popover: 40 100% 99%;
+  --popover-foreground: 210 11% 7%;
+  --primary: 210 11% 7%;           /* ink  — default button   */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 42 50% 97%;         /* bg-sand                 */
+  --secondary-foreground: 210 11% 7%;
+  --muted: 37 32% 89%;             /* light warm grey         */
+  --muted-foreground: 32 12% 28%;  /* ≈ #50483f  (ink-soft)   */
+  --accent: 184 49% 35%;           /* teal  (#2d7f85)         */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 11 87% 62%;       /* coral (#f26a4b)         */
+  --destructive-foreground: 0 0% 100%;
+  --border: 37 35% 81%;            /* ≈ #dfd2bd  (--line)     */
+  --input: 37 35% 81%;
+  --ring: 184 49% 35%;             /* teal  — focus rings     */
+  --radius: 0.75rem;               /* rounded-xl = 12 px      */
 }
 
 * {
