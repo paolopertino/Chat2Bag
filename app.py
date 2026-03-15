@@ -1,4 +1,6 @@
 import gc
+import os
+import logging
 import yaml
 
 from contextlib import asynccontextmanager
@@ -8,7 +10,7 @@ from typing import List
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from transformers import AutoProcessor, AutoModel
 
 from src.api.bags import router as bags_router
@@ -18,18 +20,50 @@ from src.ingestion.bag_parser import BagParser
 from src.retriever.global_search import GlobalSearcher
 from src.ingestion.indexer import Indexer
 from src.retriever.video_chat import VideoChat
+from src.utils.logging_utils import setup_logging
+from src.utils.paths import LOGGING_CONFIG_PATH, SETTINGS_PATH
 
 ml_models = {}
+logger = logging.getLogger(__name__)
+
+
+def _get_cors_origins() -> list[str]:
+    configured_origins = os.environ.get("CORS_ORIGINS", "")
+    if configured_origins.strip():
+        return [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
+
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
-    print("Server starting up...")
-    with open("config/settings.yaml", "r", encoding="utf-8") as f:
+    setup_logging(str(LOGGING_CONFIG_PATH))
+    logger.info("Server starting up")
+    with SETTINGS_PATH.open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    
+    model_checkpoints_path = config['models']['model_storage']
+    if not os.path.exists(model_checkpoints_path):
+        os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    ml_models["embedding_model"] = AutoModel.from_pretrained(config["models"]["embedding_model"])
-    ml_models["embedding_model_processor"] = AutoProcessor.from_pretrained(config["models"]["embedding_model"])
+    try:
+        ml_models["embedding_model"] = AutoModel.from_pretrained(os.path.join(model_checkpoints_path, config["models"]["embedding_model"]))
+    except Exception as _:
+        print("Downloading embedding model for the first time...")
+        ml_models["embedding_model"] = AutoModel.from_pretrained(config["models"]["embedding_model"])
+        ml_models["embedding_model"].save_pretrained(os.path.join(model_checkpoints_path, config["models"]["embedding_model"]))
+    
+    try:
+        ml_models["embedding_model_processor"] = AutoProcessor.from_pretrained(os.path.join(model_checkpoints_path, config["models"]["embedding_model"]))
+    except Exception as _:
+        print("Downloading embedding model processor for the first time...")
+        ml_models["embedding_model_processor"] = AutoProcessor.from_pretrained(config["models"]["embedding_model"])
+        ml_models["embedding_model_processor"].save_pretrained(os.path.join(model_checkpoints_path, config["models"]["embedding_model"]))
 
     fastapi_app.state.searcher_instance = GlobalSearcher(
         model=ml_models["embedding_model"],
@@ -38,7 +72,7 @@ async def lifespan(fastapi_app: FastAPI):
 
     yield
 
-    print("Server shutting down: Clearing GPU memory...")
+    logger.info("Server shutting down: clearing model resources")
     del fastapi_app.state.searcher_instance
     gc.collect()
 
@@ -51,12 +85,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origins=_get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -13,3 +13,4 @@ models:
   embedding_model: "google/siglip2-base-patch16-naflex"
   orchestration_llm: "gemma-2-9b"
   video_vlm: "qwen3-vl:2b" # "qwen3-vl:4b"
+  model_storage: "models"
