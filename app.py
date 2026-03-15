@@ -96,46 +96,53 @@ app.include_router(image_router)
 
 
 class IndexRequest(BaseModel):
-    bag_path: str
+    bag_path: str = Field(..., min_length=1)
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1)
     bag_paths: List[str]
-    top_k: int = 5
+    top_k: int = Field(default=5, ge=1, le=100)
 
 
 class ChatRequest(BaseModel):
-    bag_path: str
-    start_ns: int
-    duration: int = 10
-    query: str
+    bag_path: str = Field(..., min_length=1)
+    start_ns: int = Field(..., ge=0)
+    duration: int = Field(default=10, ge=1, le=300)
+    query: str = Field(..., min_length=1)
 
 
 def run_indexing_pipeline(bag_path: str):
     """Runs the heavy parsing and embedding offline."""
-    indexing_status[bag_path] = "indexing"
+    resolved_bag_path = str(Path(bag_path).expanduser().resolve())
+    indexing_status[resolved_bag_path] = "indexing"
     try:
-        parser = BagParser(bag_path)
+        parser = BagParser(resolved_bag_path)
         parser.extract_frames()
-        indexer = Indexer(bag_path, model=ml_models["embedding_model"], processor=ml_models["embedding_model_processor"])
+        indexer = Indexer(
+            resolved_bag_path,
+            model=ml_models["embedding_model"],
+            processor=ml_models["embedding_model_processor"],
+        )
         indexer.build_index()
-        indexing_status[bag_path] = "done"
-        print(f"Successfully indexed: {bag_path}")
-    except Exception as e:
-        indexing_status[bag_path] = "error"
-        print(f"Indexing failed for {bag_path}: {e}")
+        indexing_status[resolved_bag_path] = "done"
+        logger.info("Successfully indexed %s", resolved_bag_path)
+    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+        indexing_status[resolved_bag_path] = "error"
+        logger.exception("Indexing failed for %s", resolved_bag_path)
 
 
 @app.post("/api/index")
 async def index_bag(req: IndexRequest, background_tasks: BackgroundTasks):
     """Triggers extraction and indexing in the background."""
-    if not Path(req.bag_path).exists():
+    bag_path = Path(req.bag_path).expanduser().resolve()
+    if not bag_path.exists() or not bag_path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist.")
 
-    indexing_status[req.bag_path] = "indexing"
-    background_tasks.add_task(run_indexing_pipeline, req.bag_path)
-    return {"status": "Indexing started in the background", "bag": req.bag_path}
+    resolved_bag_path = str(bag_path)
+    indexing_status[resolved_bag_path] = "indexing"
+    background_tasks.add_task(run_indexing_pipeline, resolved_bag_path)
+    return {"status": "Indexing started in the background", "bag": resolved_bag_path}
 
 
 @app.post("/api/search")
@@ -156,13 +163,19 @@ async def search_bags(req: SearchRequest, request: Request):
 @app.post("/api/chat")
 async def chat_clip(req: ChatRequest):
     """Chat with a specific sequence."""
-    if not Path(req.bag_path).exists():
+    bag_path = Path(req.bag_path).expanduser().resolve()
+    if not bag_path.exists() or not bag_path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist.")
 
-    chat_engine = VideoChat(req.bag_path)
-    response_text = chat_engine.chat_with_clip(
-        start_timestamp_ns=req.start_ns, duration_sec=req.duration, query=req.query
-    )
+    try:
+        chat_engine = VideoChat(str(bag_path))
+        response_text = chat_engine.chat_with_clip(
+            start_timestamp_ns=req.start_ns, duration_sec=req.duration, query=req.query
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     if not response_text:
         raise HTTPException(

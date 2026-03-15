@@ -10,14 +10,16 @@ from rosbags.rosbag2 import Reader
 from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
+from src.utils.paths import SETTINGS_PATH
+
 logger = logging.getLogger(__name__)
 
 class BagParser:
-    def __init__(self, bag_path: str, config_path: str = "config/settings.yaml"):
+    def __init__(self, bag_path: str, config_path: Path = SETTINGS_PATH):
         self.bag_path = Path(bag_path)
         
         # Load settings
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
             
         self.topic = self.config["ingestion"]["camera_topic"]
@@ -55,28 +57,32 @@ class BagParser:
             
             for connection, timestamp_ns, rawdata in reader.messages(connections=connections):
                 if (timestamp_ns - last_saved_ns) >= interval_ns:
-                    msg = self.typestore.deserialize_cdr(rawdata, connection.msgtype)
-                    
-                    cv_img = message_to_cvimage(msg, 'bgr8')
-                    
-                    # Resize to save space and VRAM
-                    cv_img_resized = cv2.resize(cv_img, self.max_size, interpolation=cv2.INTER_AREA)
-                    
-                    frame_filename = f"frame_{timestamp_ns}.jpg"
-                    frame_path = self.thumbnail_dir / frame_filename
-                    cv2.imwrite(str(frame_path), cv_img_resized)
-                    
-                    metadata["frames"].append({
-                        "timestamp_ns": timestamp_ns,
-                        "file_path": str(frame_path.resolve())
-                    })
-                    
-                    last_saved_ns = timestamp_ns
-                    saved_count += 1
+                    try:
+                        msg = self.typestore.deserialize_cdr(rawdata, connection.msgtype)
+                        cv_img = message_to_cvimage(msg, 'bgr8')
+
+                        # Resize to save space and VRAM
+                        cv_img_resized = cv2.resize(cv_img, self.max_size, interpolation=cv2.INTER_AREA)
+
+                        frame_filename = f"frame_{timestamp_ns}.jpg"
+                        frame_path = self.thumbnail_dir / frame_filename
+                        if not cv2.imwrite(str(frame_path), cv_img_resized):
+                            raise ValueError(f"Failed to write frame to {frame_path}")
+
+                        metadata["frames"].append({
+                            "timestamp_ns": timestamp_ns,
+                            "file_path": str(frame_path.resolve())
+                        })
+
+                        last_saved_ns = timestamp_ns
+                        saved_count += 1
+                    except (ValueError, OSError, RuntimeError, cv2.error):
+                        logger.warning("Skipping frame at %s in %s due to extraction error", timestamp_ns, self.bag_path, exc_info=True)
+                        continue
 
         # Write the metadata mapping file
         metadata_path = self.artifact_dir / "metadata.json"
-        with open(metadata_path, "w") as f:
+        with metadata_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=4)
 
         logger.info("Extraction complete! Saved %s frames to %s", saved_count, self.thumbnail_dir)

@@ -6,14 +6,16 @@ from pathlib import Path
 
 import ollama
 
+from src.utils.paths import SETTINGS_PATH
+
 logger = logging.getLogger(__name__)
 
 
 class VideoChat:
-    def __init__(self, bag_path: str, config_path: str = "config/settings.yaml"):
+    def __init__(self, bag_path: str, config_path: Path = SETTINGS_PATH):
         self.bag_path = Path(bag_path)
 
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.model_name = self.config["models"]["video_vlm"]
@@ -33,7 +35,7 @@ class VideoChat:
         """Fetches a temporal window of frames and chats with them via Ollama."""
         logger.info("Loading metadata to find frames for a %ss window...", duration_sec)
 
-        with open(self.metadata_path, "r") as f:
+        with self.metadata_path.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
 
         duration_ns = int(duration_sec * 1e9)
@@ -62,17 +64,21 @@ class VideoChat:
             "Loading %s into VRAM via Ollama and analyzing sequence...", self.model_name
         )
 
-        response = ollama.chat(
-            model=self.model_name,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"These images represent a sequential video of a driving scene. {query}",
-                    "images": image_paths,
-                }
-            ],
-            keep_alive=0,
-        )
+        try:
+            response = ollama.chat(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"These images represent a sequential video of a driving scene. {query}",
+                        "images": image_paths,
+                    }
+                ],
+                keep_alive=0,
+            )
+        except Exception as exc:
+            logger.exception("Ollama request failed while analyzing %s", self.bag_path)
+            raise RuntimeError("Video chat service is unavailable. Check that Ollama is running.") from exc
 
         logger.info("\n--- VLM Analysis ---")
         logger.info(response["message"]["content"])

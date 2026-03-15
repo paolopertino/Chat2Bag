@@ -9,17 +9,19 @@ import lancedb
 
 from transformers import AutoProcessor, AutoModel
 
+from src.utils.paths import SETTINGS_PATH
+
 logger = logging.getLogger(__name__)
 
 
 class GlobalSearcher:
     def __init__(
         self,
-        config_path: str = "config/settings.yaml",
+        config_path: Path = SETTINGS_PATH,
         model=None,
         processor=None,
     ):
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.model_name = self.config["models"]["embedding_model"]
@@ -60,9 +62,7 @@ class GlobalSearcher:
                 Path(bag_path) / self.config["storage"]["artifact_dir"] / "lancedb"
             )
             if not db_path.exists():
-                logger.warning(
-                    f"Skipping {Path(bag_path).name}: No LanceDB index found."
-                )
+                logger.warning("Skipping %s: no LanceDB index found.", Path(bag_path).name)
                 continue
 
             db = lancedb.connect(str(db_path))
@@ -70,6 +70,7 @@ class GlobalSearcher:
 
             results = table.search(query_vector).metric("cosine").limit(top_k).to_list()
             for res in results:
+                res["bag_path"] = str(Path(bag_path).resolve())
                 res["source_bag"] = Path(bag_path).name
                 res["similarity_score"] = 1.0 - res["_distance"]
                 res.pop("_distance", None)

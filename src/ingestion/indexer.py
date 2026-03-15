@@ -1,4 +1,3 @@
-import gc
 import json
 import logging
 import yaml
@@ -7,11 +6,12 @@ from pathlib import Path
 
 import torch
 import lancedb
-import pyarrow as pa
 
 from PIL import Image
 from transformers import AutoProcessor, AutoModel
 from tqdm import tqdm
+
+from src.utils.paths import SETTINGS_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +20,13 @@ class Indexer:
     def __init__(
         self,
         bag_path: str,
-        config_path: str = "config/settings.yaml",
+        config_path: Path = SETTINGS_PATH,
         model=None,
         processor=None,
     ):
         self.bag_path = Path(bag_path)
 
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.model_name = self.config["models"]["embedding_model"]
@@ -56,7 +56,7 @@ class Indexer:
     def build_index(self):
         """Loads SigLIP 2, embeds frames, writes to LanceDB, and frees VRAM."""
         logger.info("Loading metadata from %s...", self.metadata_path)
-        with open(self.metadata_path, "r") as f:
+        with self.metadata_path.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
 
         frames = metadata["frames"]
@@ -76,9 +76,19 @@ class Indexer:
         logger.info("Generating embeddings for %s frames...", len(frames))
         for i in tqdm(range(0, len(frames), self.batch_size)):
             batch_meta = frames[i : i + self.batch_size]
-            images = [
-                Image.open(meta["file_path"]).convert("RGB") for meta in batch_meta
-            ]
+            valid_batch_meta = []
+            images = []
+            for meta in batch_meta:
+                try:
+                    with Image.open(meta["file_path"]) as image:
+                        images.append(image.convert("RGB"))
+                    valid_batch_meta.append(meta)
+                except (FileNotFoundError, OSError):
+                    logger.warning("Skipping unreadable frame %s during indexing", meta["file_path"], exc_info=True)
+
+            if not images:
+                continue
+
             inputs = self.processor(images=images, return_tensors="pt").to(self.device)
 
             with torch.no_grad():
@@ -90,7 +100,7 @@ class Indexer:
                 )
                 embeddings = embeddings.cpu().numpy().tolist()
 
-            for meta, emb in zip(batch_meta, embeddings):
+            for meta, emb in zip(valid_batch_meta, embeddings):
                 data_to_insert.append(
                     {
                         "timestamp_ns": meta["timestamp_ns"],
@@ -99,6 +109,10 @@ class Indexer:
                         "vector": emb,
                     }
                 )
+
+        if not data_to_insert:
+            logger.warning("No valid frames were embedded; skipping LanceDB write.")
+            return
 
         logger.info("Writing embeddings to LanceDB...")
         if table_name in db.list_tables():
