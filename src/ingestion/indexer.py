@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import yaml
@@ -84,7 +85,11 @@ class Indexer:
                         images.append(image.convert("RGB"))
                     valid_batch_meta.append(meta)
                 except (FileNotFoundError, OSError):
-                    logger.warning("Skipping unreadable frame %s during indexing", meta["file_path"], exc_info=True)
+                    logger.warning(
+                        "Skipping unreadable frame %s during indexing",
+                        meta["file_path"],
+                        exc_info=True,
+                    )
 
             if not images:
                 continue
@@ -132,6 +137,10 @@ class Indexer:
 
 
 if __name__ == "__main__":
-    example_path = "/home/paolopertino/adehome/aida_code/bags/2025-11-05_19-00_normal"  # "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
-    indexer = Indexer(example_path)
+    parser = argparse.ArgumentParser(
+        description="Test Index frames from a bag into LanceDB."
+    )
+    parser.add_argument("bag_path", type=str, help="Path to the bag directory.")
+    args = parser.parse_args()
+    indexer = Indexer(args.bag_path)
     indexer.build_index()

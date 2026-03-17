@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import yaml
@@ -78,7 +79,9 @@ class VideoChat:
             )
         except Exception as exc:
             logger.exception("Ollama request failed while analyzing %s", self.bag_path)
-            raise RuntimeError("Video chat service is unavailable. Check that Ollama is running.") from exc
+            raise RuntimeError(
+                "Video chat service is unavailable. Check that Ollama is running."
+            ) from exc
 
         logger.info("\n--- VLM Analysis ---")
         logger.info(response["message"]["content"])
@@ -86,17 +89,29 @@ class VideoChat:
 
 
 if __name__ == "__main__":
-    example_path = (
-        "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
+    parser = argparse.ArgumentParser(description="Test VideoChat with a specific clip.")
+    parser.add_argument(
+        "--bag_path",
+        type=str,
+        required=True,
+        help="Path to the bag directory containing the artifact/metadata.json",
     )
-    chat = VideoChat(example_path)
+    parser.add_argument(
+        "--start_ns",
+        type=int,
+        required=True,
+        help="Start timestamp in nanoseconds for the clip to chat with.",
+    )
+    args = parser.parse_args()
+    chat = VideoChat(args.bag_path)
 
-    # Example: User selected a timestamp from the search results, wants to see the next 10 seconds
-    # Make sure to replace start_ns with a real timestamp from your test run
-    start_ns = 1740734312724935438
-    chat.chat_with_clip(
-        start_timestamp_ns=start_ns,
-        duration_sec=10,
-        query="Is the car passing with a red light?",
-        max_frames=20,
+    # Example: User selected a timestamp from the search results, wants to see the next 5 seconds
+    # Set start_ns with a real timestamp from your test run
+    print(
+        chat.chat_with_clip(
+            start_timestamp_ns=args.start_ns,
+            duration_sec=5,
+            query="Is there a red car in the sequence?",
+            max_frames=20,
+        )
     )

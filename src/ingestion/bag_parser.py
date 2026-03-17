@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import yaml
@@ -14,18 +15,19 @@ from src.utils.paths import SETTINGS_PATH
 
 logger = logging.getLogger(__name__)
 
+
 class BagParser:
     def __init__(self, bag_path: str, config_path: Path = SETTINGS_PATH):
         self.bag_path = Path(bag_path)
-        
+
         # Load settings
         with Path(config_path).open("r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
-            
+
         self.topic = self.config["ingestion"]["camera_topic"]
         self.fps = self.config["ingestion"]["sampling_fps"]
         self.max_size = tuple(self.config["ingestion"]["max_image_size"])
-        
+
         # Set up the artifact directories
         self.artifact_dir = self.bag_path / self.config["storage"]["artifact_dir"]
         self.thumbnail_dir = self.artifact_dir / "thumbnails"
@@ -36,12 +38,8 @@ class BagParser:
     def extract_frames(self):
         """Reads the bag and extracts downsampled frames to the artifact folder."""
         logger.info("Opening bag: %s", self.bag_path.name)
-        
-        metadata = {
-            "bag_name": self.bag_path.name,
-            "topic": self.topic,
-            "frames": []
-        }
+
+        metadata = {"bag_name": self.bag_path.name, "topic": self.topic, "frames": []}
 
         # Calculate the nanosecond interval based on desired FPS
         interval_ns = int((1.0 / self.fps) * 1e9)
@@ -51,33 +49,50 @@ class BagParser:
         with Reader(self.bag_path) as reader:
             connections = [x for x in reader.connections if x.topic == self.topic]
             if not connections:
-                raise ValueError(f"Topic {self.topic} not found in {self.bag_path.name}")
+                raise ValueError(
+                    f"Topic {self.topic} not found in {self.bag_path.name}"
+                )
 
-            logger.info("Extracting frames at %s FPS. This might take a moment...", self.fps)
-            
-            for connection, timestamp_ns, rawdata in reader.messages(connections=connections):
+            logger.info(
+                "Extracting frames at %s FPS. This might take a moment...", self.fps
+            )
+
+            for connection, timestamp_ns, rawdata in reader.messages(
+                connections=connections
+            ):
                 if (timestamp_ns - last_saved_ns) >= interval_ns:
                     try:
-                        msg = self.typestore.deserialize_cdr(rawdata, connection.msgtype)
-                        cv_img = message_to_cvimage(msg, 'bgr8')
+                        msg = self.typestore.deserialize_cdr(
+                            rawdata, connection.msgtype
+                        )
+                        cv_img = message_to_cvimage(msg, "bgr8")
 
                         # Resize to save space and VRAM
-                        cv_img_resized = cv2.resize(cv_img, self.max_size, interpolation=cv2.INTER_AREA)
+                        cv_img_resized = cv2.resize(
+                            cv_img, self.max_size, interpolation=cv2.INTER_AREA
+                        )
 
                         frame_filename = f"frame_{timestamp_ns}.jpg"
                         frame_path = self.thumbnail_dir / frame_filename
                         if not cv2.imwrite(str(frame_path), cv_img_resized):
                             raise ValueError(f"Failed to write frame to {frame_path}")
 
-                        metadata["frames"].append({
-                            "timestamp_ns": timestamp_ns,
-                            "file_path": str(frame_path.resolve())
-                        })
+                        metadata["frames"].append(
+                            {
+                                "timestamp_ns": timestamp_ns,
+                                "file_path": str(frame_path.resolve()),
+                            }
+                        )
 
                         last_saved_ns = timestamp_ns
                         saved_count += 1
                     except (ValueError, OSError, RuntimeError, cv2.error):
-                        logger.warning("Skipping frame at %s in %s due to extraction error", timestamp_ns, self.bag_path, exc_info=True)
+                        logger.warning(
+                            "Skipping frame at %s in %s due to extraction error",
+                            timestamp_ns,
+                            self.bag_path,
+                            exc_info=True,
+                        )
                         continue
 
         # Write the metadata mapping file
@@ -85,10 +100,17 @@ class BagParser:
         with metadata_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=4)
 
-        logger.info("Extraction complete! Saved %s frames to %s", saved_count, self.thumbnail_dir)
+        logger.info(
+            "Extraction complete! Saved %s frames to %s",
+            saved_count,
+            self.thumbnail_dir,
+        )
         return metadata_path
 
+
 if __name__ == "__main__":
-    example_path = "/home/paolopertino/adehome/aida_code/bags/2025-11-05_19-00_normal" # "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
-    parser = BagParser(example_path)
+    parser = argparse.ArgumentParser(description="Test extracting frames from a bag.")
+    parser.add_argument("bag_path", type=str, help="Path to the bag directory.")
+    args = parser.parse_args()
+    parser = BagParser(args.bag_path)
     parser.extract_frames()
