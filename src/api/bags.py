@@ -47,7 +47,9 @@ def _find_bag_dirs_recursive(root: Path, max_depth: int = 10) -> List[Path]:
                 if _is_bag_dir(item):
                     bag_dirs.append(item)
                 elif item.is_dir():
-                    bag_dirs.extend(_find_bag_dirs_recursive(item, max_depth=max_depth - 1))
+                    bag_dirs.extend(
+                        _find_bag_dirs_recursive(item, max_depth=max_depth - 1)
+                    )
             except (PermissionError, OSError):
                 continue
     except (PermissionError, OSError):
@@ -57,13 +59,19 @@ def _find_bag_dirs_recursive(root: Path, max_depth: int = 10) -> List[Path]:
 
 
 @router.get("/scan")
-async def scan_bags(root_dir: str = Query(..., description="Root directory containing bag folders")):
+async def scan_bags(
+    root_dir: str = Query(..., description="Root directory containing bag folders")
+):
     root_path = Path(root_dir).expanduser().resolve()
     if not root_path.exists() or not root_path.is_dir():
-        raise HTTPException(status_code=400, detail="root_dir must be an existing directory")
+        raise HTTPException(
+            status_code=400, detail="root_dir must be an existing directory"
+        )
 
     bags: List[Dict[str, Any]] = []
-    bag_dirs = sorted(_find_bag_dirs_recursive(root_path), key=lambda p: str(p.resolve()))
+    bag_dirs = sorted(
+        _find_bag_dirs_recursive(root_path), key=lambda p: str(p.resolve())
+    )
     for candidate in bag_dirs:
 
         lancedb_dir = _artifact_dir_for_bag(candidate) / "lancedb"
@@ -81,7 +89,9 @@ async def scan_bags(root_dir: str = Query(..., description="Root directory conta
 
 
 @router.get("/status")
-async def bag_status(bag_path: str = Query(..., description="Absolute path of bag directory")):
+async def bag_status(
+    bag_path: str = Query(..., description="Absolute path of bag directory")
+):
     path = Path(bag_path).expanduser().resolve()
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
@@ -100,7 +110,9 @@ async def bag_status(bag_path: str = Query(..., description="Absolute path of ba
 async def bag_frames(
     bag_path: str = Query(..., description="Absolute path of bag directory"),
     start_ns: int = Query(..., ge=0, description="Start timestamp in nanoseconds"),
-    duration_sec: float = Query(10.0, ge=0.1, le=300.0, description="Window size in seconds"),
+    duration_sec: float = Query(
+        10.0, ge=0.1, le=300.0, description="Window size in seconds"
+    ),
 ):
     path = Path(bag_path).expanduser().resolve()
     if not path.exists() or not path.is_dir():
@@ -108,7 +120,9 @@ async def bag_frames(
 
     metadata_path = _metadata_path_for_bag(path)
     if not metadata_path.exists() or not metadata_path.is_file():
-        raise HTTPException(status_code=404, detail="Bag metadata not found. Index the bag first.")
+        raise HTTPException(
+            status_code=404, detail="Bag metadata not found. Index the bag first."
+        )
 
     with metadata_path.open("r", encoding="utf-8") as handle:
         metadata = json.load(handle)

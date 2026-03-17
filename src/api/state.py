@@ -26,11 +26,15 @@ class PersistentStatusStore(MutableMapping[str, str]):
             with self._storage_path.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
         except (OSError, json.JSONDecodeError):
-            logger.exception("Failed to load persisted indexing state from %s", self._storage_path)
+            logger.exception(
+                "Failed to load persisted indexing state from %s", self._storage_path
+            )
             return
 
         if not isinstance(payload, dict):
-            logger.warning("Ignoring invalid indexing state payload in %s", self._storage_path)
+            logger.warning(
+                "Ignoring invalid indexing state payload in %s", self._storage_path
+            )
             return
 
         self._data = {str(key): str(value) for key, value in payload.items()}
@@ -67,4 +71,6 @@ class PersistentStatusStore(MutableMapping[str, str]):
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
             return self._data.get(key, default)
+
+
 indexing_status = PersistentStatusStore(STATE_PATH)

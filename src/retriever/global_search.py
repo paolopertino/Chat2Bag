@@ -27,11 +27,9 @@ class GlobalSearcher:
         self.model_name = self.config["models"]["embedding_model"]
         self.device = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
 
-        logger.info(
-            "Loading %s into VRAM (%s)...", self.model_name, self.device
-        )
-        self.model : AutoModel = model.to(self.device)
-        self.processor : AutoProcessor = processor
+        logger.info("Loading %s into VRAM (%s)...", self.model_name, self.device)
+        self.model: AutoModel = model.to(self.device)
+        self.processor: AutoProcessor = processor
         self.model.eval()
 
     def search(self, query: str, bag_paths: List[str], top_k: int = 5):
@@ -62,7 +60,9 @@ class GlobalSearcher:
                 Path(bag_path) / self.config["storage"]["artifact_dir"] / "lancedb"
             )
             if not db_path.exists():
-                logger.warning("Skipping %s: no LanceDB index found.", Path(bag_path).name)
+                logger.warning(
+                    "Skipping %s: no LanceDB index found.", Path(bag_path).name
+                )
                 continue
 
             db = lancedb.connect(str(db_path))

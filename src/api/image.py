@@ -18,7 +18,9 @@ _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
 
 
 @router.get("/image")
-async def get_image(path: str = Query(..., description="Absolute path to extracted frame image")):
+async def get_image(
+    path: str = Query(..., description="Absolute path to extracted frame image")
+):
     image_path = Path(path).expanduser().resolve()
     image_path_str = str(image_path)
 
@@ -26,10 +28,17 @@ async def get_image(path: str = Query(..., description="Absolute path to extract
         raise HTTPException(status_code=400, detail="Path must be absolute")
 
     if not _FRAME_PATTERN.match(image_path_str):
-        raise HTTPException(status_code=400, detail="Path is not a valid extracted frame")
+        raise HTTPException(
+            status_code=400, detail="Path is not a valid extracted frame"
+        )
 
-    if image_path.parent.name != "thumbnails" or image_path.parent.parent.name != _ARTIFACT_DIR_NAME:
-        raise HTTPException(status_code=400, detail="Path is not inside the extracted frame directory")
+    if (
+        image_path.parent.name != "thumbnails"
+        or image_path.parent.parent.name != _ARTIFACT_DIR_NAME
+    ):
+        raise HTTPException(
+            status_code=400, detail="Path is not inside the extracted frame directory"
+        )
 
     if not image_path.exists() or not image_path.is_file():
         raise HTTPException(status_code=404, detail="Image not found")
