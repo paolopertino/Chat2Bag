@@ -11,3 +11,6 @@ wheels/
 
 # Model checkpoints folder
 models/
+
+# Frontend Build files
+static/
