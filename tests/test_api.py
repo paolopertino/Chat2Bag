@@ -4,8 +4,8 @@ import time
 
 BASE_URL = "http://127.0.0.1:8000/api"
 
-TEST_BAG_1 = "/home/paolopertino/adehome/aida_code/bags/2025-02-28_10-17_sensors_raw"
-TEST_BAG_2 = "/home/paolopertino/adehome/aida_code/bags/2025-11-05_19-00_normal"
+TEST_BAG_1 = "~/bags/my_bag1/"
+TEST_BAG_2 = "~/bags/my_bag2/"
 
 def test_indexing():
     print("\n--- Testing Phase A: Indexing ---")
@@ -75,5 +75,5 @@ if __name__ == "__main__":
     
     # Test chatting with the top result
     if best_timestamp:
-        print(f"\nTaking the best hit (Timestamp: {best_timestamp}) and feeding it to Qwen...")
+        print(f"\nTaking the best hit (Timestamp: {best_timestamp}) and feeding it to VLM...")
         test_chat(best_timestamp)
