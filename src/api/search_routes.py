@@ -1,7 +1,11 @@
 from typing import List
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from src.api.dependencies import get_search_service
+from src.services.search_service import SearchService
 
 router = APIRouter(prefix="/api", tags=["search"])
 
@@ -13,17 +17,18 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/search")
-async def search_bags(req: SearchRequest, request: Request):
+async def search_bags(
+    req: SearchRequest,
+    search_service: Annotated[SearchService, Depends(get_search_service)],
+):
     """Federated search across multiple bags using the shared Searcher object."""
-    if not req.bag_paths:
-        raise HTTPException(
-            status_code=400, detail="Must provide at least one bag path."
+    try:
+        results = search_service.search(
+            query=req.query,
+            bag_paths=req.bag_paths,
+            top_k=req.top_k,
         )
-
-    results = request.app.state.searcher_instance.search(
-        query=req.query,
-        bag_paths=req.bag_paths,
-        top_k=req.top_k,
-    )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"query": req.query, "results": results}

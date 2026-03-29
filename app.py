@@ -18,6 +18,7 @@ from src.api import (
     search_router,
 )
 from src.core import get_app_config
+from src.services.component_factory import BackendComponentFactory
 from src.utils.logging_utils import setup_logging
 from src.utils.paths import LOGGING_CONFIG_PATH
 
@@ -77,15 +78,21 @@ async def lifespan(fastapi_app: FastAPI):
     fastapi_app.state.embedding_model = embedding_model
     fastapi_app.state.embedding_model_processor = embedding_model_processor
 
-    fastapi_app.state.searcher_instance = GlobalSearcher(
-        model=fastapi_app.state.embedding_model,
-        processor=fastapi_app.state.embedding_model_processor,
+    fastapi_app.state.component_factory = BackendComponentFactory(
+        config=config,
+        embedding_model=embedding_model,
+        embedding_processor=embedding_model_processor,
+    )
+
+    fastapi_app.state.searcher_instance = (
+        fastapi_app.state.component_factory.create_global_searcher()
     )
 
     yield
 
     logger.info("Server shutting down: clearing model resources")
     del fastapi_app.state.searcher_instance
+    del fastapi_app.state.component_factory
     del fastapi_app.state.embedding_model_processor
     del fastapi_app.state.embedding_model
     del fastapi_app.state.app_config
