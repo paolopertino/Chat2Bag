@@ -9,6 +9,7 @@ import lancedb
 from transformers import AutoProcessor, AutoModel
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,6 @@ class GlobalSearcher:
         app_config = config or get_app_config()
 
         self.model_name = app_config.models.embedding_model
-        self.artifact_dir_name = app_config.storage.artifact_dir
         self.device = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
 
         logger.info("Loading %s into VRAM (%s)...", self.model_name, self.device)
@@ -55,7 +55,7 @@ class GlobalSearcher:
 
         all_results = []
         for bag_path in bag_paths:
-            db_path = Path(bag_path) / self.artifact_dir_name / "lancedb"
+            db_path = resolve_artifact_path(bag_path=Path(bag_path)) / "lancedb"
             if not db_path.exists():
                 logger.warning(
                     "Skipping %s: no LanceDB index found.", Path(bag_path).name

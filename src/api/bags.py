@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.api.state import indexing_status
 from src.core.settings import get_settings
+from src.core.storage import resolve_artifact_path
 
 router = APIRouter(prefix="/api/bags", tags=["bags"])
 
@@ -16,7 +17,7 @@ _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
 
 
 def _artifact_dir_for_bag(path: Path) -> Path:
-    return path / _ARTIFACT_DIR_NAME
+    return resolve_artifact_path(bag_path=path)
 
 
 def _metadata_path_for_bag(path: Path) -> Path:

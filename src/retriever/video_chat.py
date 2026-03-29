@@ -7,6 +7,7 @@ from pathlib import Path
 import ollama
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class VideoChat:
         app_config = config or get_app_config()
 
         self.model_name = app_config.models.video_vlm
-        self.artifact_dir = self.bag_path / app_config.storage.artifact_dir
+        self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
         self.metadata_path = self.artifact_dir / "metadata.json"
 
         if not self.metadata_path.exists():

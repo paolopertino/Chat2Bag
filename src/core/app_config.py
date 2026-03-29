@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Optional
 
 from src.core.settings import get_settings
 
@@ -15,6 +16,7 @@ class IngestionConfig:
 @dataclass(frozen=True)
 class StorageConfig:
     artifact_dir: str
+    storage_path: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ def get_app_config() -> AppConfig:
         ),
         storage=StorageConfig(
             artifact_dir=str(settings["storage"]["artifact_dir"]),
+            storage_path=str(settings["storage"]["storage_path"]) if settings["storage"]["storage_path"] is not None else None
         ),
         models=ModelsConfig(
             embedding_model=str(settings["models"]["embedding_model"]),

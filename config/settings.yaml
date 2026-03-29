@@ -1,16 +1,15 @@
 ingestion:
-  camera_topic: "/lucid_vision/lucid_cam_front_center/image_rect/compressed"
-  # Subsampling rate: 1.0 means 1 frame per second.
-  sampling_fps: 1.0 
-  max_image_size: [512, 512]
-  batch_size: 8
+  camera_topic: "/lucid_vision/lucid_cam_front_center/image_rect/compressed"                # ROS2 topic to subscribe to for extracting image frames
+  sampling_fps: 1.0                                                                         # Subsampling rate: 1.0 means 1 frame per second.
+  max_image_size: [512, 512]                                                                # Maximum size (width, height) for resizing images before processing.
+  batch_size: 8                                                                             # Number of frames to process in a batch for feature extraction.
 
 storage:
-  # The name of the hidden artifact folder created next to the .mcap files
-  artifact_dir: ".bag_chat"
+  artifact_dir: ".bag_chat"                                                                 # The name of the hidden artifact folder created to store app data.
+  storage_path: null                                                                        # Optional path to store the artifact directory. If null, it defaults to the indexed bag directory.
 
 models:
-  embedding_model: "google/siglip2-base-patch16-naflex"
+  embedding_model: "google/siglip2-base-patch16-naflex"                                     # The model used for extracting visual text-aligned features from images. You can choose from various models available on Hugging Face, such as "google/siglip2-base-patch16-naflex".
   orchestration_llm: "gemma-2-9b"
-  video_vlm: "qwen3-vl:2b" # "qwen3-vl:4b"
-  model_storage: "models"
+  video_vlm: "qwen3-vl:2b" # "qwen3-vl:4b"                                                  # The model used for video understanding and question answering. You can choose among Ollama's video-capable models, such as "qwen3-vl:2b".
+  model_storage: "models"                                                                   # Directory name where downloaded models checkpoints will be stored.

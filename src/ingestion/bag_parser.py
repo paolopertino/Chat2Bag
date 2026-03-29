@@ -11,6 +11,7 @@ from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,8 @@ class BagParser:
         self.max_size = app_config.ingestion.max_image_size
 
         # Set up the artifact directories
-        self.artifact_dir = self.bag_path / app_config.storage.artifact_dir
+        self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
+
         self.thumbnail_dir = self.artifact_dir / "thumbnails"
         self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
