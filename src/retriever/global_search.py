@@ -1,5 +1,4 @@
 import logging
-import yaml
 
 from pathlib import Path
 from typing import List
@@ -9,7 +8,7 @@ import lancedb
 
 from transformers import AutoProcessor, AutoModel
 
-from src.utils.paths import SETTINGS_PATH
+from src.core.app_config import AppConfig, get_app_config
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +16,14 @@ logger = logging.getLogger(__name__)
 class GlobalSearcher:
     def __init__(
         self,
-        config_path: Path = SETTINGS_PATH,
+        config: AppConfig | None = None,
         model=None,
         processor=None,
     ):
-        with Path(config_path).open("r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
+        app_config = config or get_app_config()
 
-        self.model_name = self.config["models"]["embedding_model"]
+        self.model_name = app_config.models.embedding_model
+        self.artifact_dir_name = app_config.storage.artifact_dir
         self.device = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
 
         logger.info("Loading %s into VRAM (%s)...", self.model_name, self.device)
@@ -56,9 +55,7 @@ class GlobalSearcher:
 
         all_results = []
         for bag_path in bag_paths:
-            db_path = (
-                Path(bag_path) / self.config["storage"]["artifact_dir"] / "lancedb"
-            )
+            db_path = Path(bag_path) / self.artifact_dir_name / "lancedb"
             if not db_path.exists():
                 logger.warning(
                     "Skipping %s: no LanceDB index found.", Path(bag_path).name

@@ -1,18 +1,16 @@
-import yaml
 import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from src.utils.paths import SETTINGS_PATH
+from src.core.settings import get_settings
 
 router = APIRouter(prefix="/api", tags=["images"])
 
 _FRAME_PATTERN = re.compile(r"^.*/\.bag_chat/thumbnails/frame_\d+\.jpg$")
 
-with SETTINGS_PATH.open("r", encoding="utf-8") as handle:
-    _SETTINGS = yaml.safe_load(handle)
+_SETTINGS = get_settings()
 
 _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
 

@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import yaml
 
 from pathlib import Path
 
@@ -11,25 +10,22 @@ from rosbags.rosbag2 import Reader
 from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
-from src.utils.paths import SETTINGS_PATH
+from src.core.app_config import AppConfig, get_app_config
 
 logger = logging.getLogger(__name__)
 
 
 class BagParser:
-    def __init__(self, bag_path: str, config_path: Path = SETTINGS_PATH):
+    def __init__(self, bag_path: str, config: AppConfig | None = None):
         self.bag_path = Path(bag_path)
+        app_config = config or get_app_config()
 
-        # Load settings
-        with Path(config_path).open("r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
-
-        self.topic = self.config["ingestion"]["camera_topic"]
-        self.fps = self.config["ingestion"]["sampling_fps"]
-        self.max_size = tuple(self.config["ingestion"]["max_image_size"])
+        self.topic = app_config.ingestion.camera_topic
+        self.fps = app_config.ingestion.sampling_fps
+        self.max_size = app_config.ingestion.max_image_size
 
         # Set up the artifact directories
-        self.artifact_dir = self.bag_path / self.config["storage"]["artifact_dir"]
+        self.artifact_dir = self.bag_path / app_config.storage.artifact_dir
         self.thumbnail_dir = self.artifact_dir / "thumbnails"
         self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 

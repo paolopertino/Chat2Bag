@@ -3,16 +3,14 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.state import indexing_status
-from src.utils.paths import SETTINGS_PATH
+from src.core.settings import get_settings
 
 router = APIRouter(prefix="/api/bags", tags=["bags"])
 
-with SETTINGS_PATH.open("r", encoding="utf-8") as handle:
-    _SETTINGS = yaml.safe_load(handle)
+_SETTINGS = get_settings()
 
 _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
 
@@ -124,8 +122,8 @@ async def bag_frames(
             status_code=404, detail="Bag metadata not found. Index the bag first."
         )
 
-    with metadata_path.open("r", encoding="utf-8") as handle:
-        metadata = json.load(handle)
+    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
+        metadata = json.load(metadata_handle)
 
     duration_ns = int(duration_sec * 1e9)
     end_ns = start_ns + duration_ns

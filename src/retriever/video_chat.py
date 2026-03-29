@@ -1,26 +1,23 @@
 import argparse
 import json
 import logging
-import yaml
 
 from pathlib import Path
 
 import ollama
 
-from src.utils.paths import SETTINGS_PATH
+from src.core.app_config import AppConfig, get_app_config
 
 logger = logging.getLogger(__name__)
 
 
 class VideoChat:
-    def __init__(self, bag_path: str, config_path: Path = SETTINGS_PATH):
+    def __init__(self, bag_path: str, config: AppConfig | None = None):
         self.bag_path = Path(bag_path)
+        app_config = config or get_app_config()
 
-        with Path(config_path).open("r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
-
-        self.model_name = self.config["models"]["video_vlm"]
-        self.artifact_dir = self.bag_path / self.config["storage"]["artifact_dir"]
+        self.model_name = app_config.models.video_vlm
+        self.artifact_dir = self.bag_path / app_config.storage.artifact_dir
         self.metadata_path = self.artifact_dir / "metadata.json"
 
         if not self.metadata_path.exists():

@@ -1,7 +1,6 @@
 import gc
 import os
 import logging
-import yaml
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,9 +17,9 @@ from src.api import (
     indexing_router,
     search_router,
 )
-from src.retriever.global_search import GlobalSearcher
+from src.core import get_app_config
 from src.utils.logging_utils import setup_logging
-from src.utils.paths import LOGGING_CONFIG_PATH, SETTINGS_PATH
+from src.utils.paths import LOGGING_CONFIG_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -44,37 +43,37 @@ def _get_cors_origins() -> list[str]:
 async def lifespan(fastapi_app: FastAPI):
     setup_logging(str(LOGGING_CONFIG_PATH))
     logger.info("Server starting up")
-    with SETTINGS_PATH.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    config = get_app_config()
 
-    model_checkpoints_path = config["models"]["model_storage"]
+    model_checkpoints_path = config.models.model_storage
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
     try:
         embedding_model = AutoModel.from_pretrained(
-            os.path.join(model_checkpoints_path, config["models"]["embedding_model"])
+            os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
     except (OSError, ValueError):
         print("Downloading embedding model for the first time...")
-        embedding_model = AutoModel.from_pretrained(config["models"]["embedding_model"])
+        embedding_model = AutoModel.from_pretrained(config.models.embedding_model)
         embedding_model.save_pretrained(
-            os.path.join(model_checkpoints_path, config["models"]["embedding_model"])
+            os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
 
     try:
         embedding_model_processor = AutoProcessor.from_pretrained(
-            os.path.join(model_checkpoints_path, config["models"]["embedding_model"])
+            os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
     except (OSError, ValueError):
         print("Downloading embedding model processor for the first time...")
         embedding_model_processor = AutoProcessor.from_pretrained(
-            config["models"]["embedding_model"]
+            config.models.embedding_model
         )
         embedding_model_processor.save_pretrained(
-            os.path.join(model_checkpoints_path, config["models"]["embedding_model"])
+            os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
 
+    fastapi_app.state.app_config = config
     fastapi_app.state.embedding_model = embedding_model
     fastapi_app.state.embedding_model_processor = embedding_model_processor
 
@@ -89,6 +88,7 @@ async def lifespan(fastapi_app: FastAPI):
     del fastapi_app.state.searcher_instance
     del fastapi_app.state.embedding_model_processor
     del fastapi_app.state.embedding_model
+    del fastapi_app.state.app_config
     gc.collect()
 
 
