@@ -12,6 +12,12 @@ interface SearchRequest {
   top_k: number;
 }
 
+interface SimilarSearchRequest {
+  file_path: string;
+  bag_paths: string[];
+  top_k: number;
+}
+
 interface IndexRequest {
   bag_path: string;
 }
@@ -24,11 +30,14 @@ interface ChatRequest {
 }
 
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers: isFormData
+      ? init?.headers
+      : {
+          "Content-Type": "application/json",
+          ...(init?.headers ?? {}),
+        },
     ...init,
   });
 
@@ -82,6 +91,27 @@ export async function getFrames(
 
 export async function search(payload: SearchRequest): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function searchByImage(file: File, bagPaths: string[], topK: number): Promise<SearchResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("top_k", String(topK));
+  for (const bagPath of bagPaths) {
+    formData.append("bag_paths", bagPath);
+  }
+
+  return http<SearchResponse>("/api/search/image", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function searchSimilar(payload: SimilarSearchRequest): Promise<SearchResponse> {
+  return http<SearchResponse>("/api/search/similar", {
     method: "POST",
     body: JSON.stringify(payload),
   });

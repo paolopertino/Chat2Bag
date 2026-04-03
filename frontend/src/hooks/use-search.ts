@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import { search } from "../api/client";
+import { search, searchByImage, searchSimilar } from "../api/client";
 import type { SearchResult } from "../api/types";
 
 export function useSearch() {
@@ -36,6 +36,48 @@ export function useSearch() {
     }
   }, [query, topK]);
 
+  const runImageSearch = useCallback(async (file: File, bagPaths: string[]) => {
+    if (bagPaths.length === 0) {
+      toast.error("Select at least one bag.");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await searchByImage(file, bagPaths, topK);
+      setResults(response.results);
+      toast.success(`Image search complete (${response.results.length} results).`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Image search failed.";
+      toast.error(message);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [topK]);
+
+  const runSimilarSearch = useCallback(async (result: SearchResult, bagPaths: string[]) => {
+    if (bagPaths.length === 0) {
+      toast.error("Select at least one bag.");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await searchSimilar({
+        file_path: result.file_path,
+        bag_paths: bagPaths,
+        top_k: topK,
+      });
+      setResults(response.results);
+      toast.success(`Found ${response.results.length} similar result(s).`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Similar image search failed.";
+      toast.error(message);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [topK]);
+
   return {
     query,
     setQuery,
@@ -44,5 +86,7 @@ export function useSearch() {
     results,
     isSearching,
     runSearch,
+    runImageSearch,
+    runSimilarSearch,
   };
 }

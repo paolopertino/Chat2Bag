@@ -25,7 +25,17 @@ function App() {
     toggleAllBags,
   } = useBags();
 
-  const { query, setQuery, topK, setTopK, results, isSearching, runSearch } = useSearch();
+  const {
+    query,
+    setQuery,
+    topK,
+    setTopK,
+    results,
+    isSearching,
+    runSearch,
+    runImageSearch,
+    runSimilarSearch,
+  } = useSearch();
   const {
     activeFrame,
     canLoadMoreLeft,
@@ -95,12 +105,22 @@ function App() {
           topK={topK}
           onTopKChange={setTopK}
           onSearch={() => runSearch(selectedBagPaths)}
+          onImageUpload={(file) => {
+            void runImageSearch(file, selectedBagPaths);
+          }}
           isSearching={isSearching}
           selectedBagCount={selectedBagPaths.length}
         />
       }
     >
-      <ResultsGrid results={results} isSearching={isSearching} onResultClick={openViewer} />
+      <ResultsGrid
+        results={results}
+        isSearching={isSearching}
+        onResultClick={openViewer}
+        onSimilarSearch={(result) => {
+          void runSimilarSearch(result, selectedBagPaths);
+        }}
+      />
       <SequenceViewer
         activeFrame={activeFrame}
         canLoadMoreLeft={canLoadMoreLeft}

@@ -7,9 +7,10 @@ interface ResultsGridProps {
   results: SearchResult[];
   isSearching: boolean;
   onResultClick?: (result: SearchResult) => void;
+  onSimilarSearch?: (result: SearchResult) => void;
 }
 
-export function ResultsGrid({ results, isSearching, onResultClick }: ResultsGridProps) {
+export function ResultsGrid({ results, isSearching, onResultClick, onSimilarSearch }: ResultsGridProps) {
   if (isSearching) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -36,6 +37,7 @@ export function ResultsGrid({ results, isSearching, onResultClick }: ResultsGrid
           result={result}
           imageUrl={getImageUrl(result.file_path)}
           onClick={onResultClick ? () => onResultClick(result) : undefined}
+          onSimilarSearch={onSimilarSearch}
         />
       ))}
     </div>
