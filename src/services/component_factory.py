@@ -6,10 +6,17 @@ from src.retriever.video_chat import VideoChat
 
 
 class BackendComponentFactory:
-    def __init__(self, config: AppConfig, embedding_model=None, embedding_processor=None):
+    def __init__(
+        self,
+        config: AppConfig,
+        embedding_model=None,
+        embedding_processor=None,
+        device: str | None = None,
+    ):
         self._config = config
         self._embedding_model = embedding_model
         self._embedding_processor = embedding_processor
+        self._device = device
 
     def create_bag_parser(self, bag_path: str) -> BagParser:
         return BagParser(bag_path=bag_path, config=self._config)
@@ -20,6 +27,7 @@ class BackendComponentFactory:
             config=self._config,
             model=self._embedding_model,
             processor=self._embedding_processor,
+            device=self._device,
         )
 
     def create_global_searcher(self) -> GlobalSearcher:
@@ -27,6 +35,7 @@ class BackendComponentFactory:
             config=self._config,
             model=self._embedding_model,
             processor=self._embedding_processor,
+            device=self._device,
         )
 
     def create_video_chat(self, bag_path: str) -> VideoChat:

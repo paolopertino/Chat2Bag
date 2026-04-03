@@ -56,7 +56,7 @@ class VideoChat:
         step = max(1, len(window_frames) // max_frames)
         sampled_frames = window_frames[::step][:max_frames]
 
-        image_paths = [f["file_path"] for f in sampled_frames]
+        image_paths = [str(self.artifact_dir / f["file_path"]) for f in sampled_frames]
         logger.info("Selected %s frames for the deep dive.", len(image_paths))
 
         logger.info(

@@ -10,6 +10,7 @@ def get_indexing_service(request: Request) -> IndexingService:
     return IndexingService(
         factory=request.app.state.component_factory,
         status_store=indexing_status,
+        searcher=request.app.state.searcher_instance,
     )
 
 

@@ -12,6 +12,7 @@ from transformers import AutoProcessor, AutoModel
 from tqdm import tqdm
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class Indexer:
         config: AppConfig | None = None,
         model=None,
         processor=None,
+        device: str | None = None,
     ):
         self.bag_path = Path(bag_path)
         app_config = config or get_app_config()
@@ -32,13 +34,15 @@ class Indexer:
         self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
         self.metadata_path = self.artifact_dir / "metadata.json"
         self.db_path = self.artifact_dir / "lancedb"
-        print(self.artifact_dir)
+
         if not self.metadata_path.exists():
             raise FileNotFoundError(
                 f"Metadata not found at {self.metadata_path}. Run extraction first."
             )
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device if device is not None else (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self.batch_size = app_config.ingestion.batch_size
 
         self.model = (
@@ -57,6 +61,14 @@ class Indexer:
         logger.info("Loading metadata from %s...", self.metadata_path)
         with self.metadata_path.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
+
+        schema_version = metadata.get("schema_version", 1)
+        if schema_version < METADATA_SCHEMA_VERSION:
+            logger.warning(
+                "Metadata schema v%d is older than current v%d; re-index recommended.",
+                schema_version,
+                METADATA_SCHEMA_VERSION,
+            )
 
         frames = metadata["frames"]
         if not frames:
@@ -78,14 +90,15 @@ class Indexer:
             valid_batch_meta = []
             images = []
             for meta in batch_meta:
+                abs_path = str(self.artifact_dir / meta["file_path"])
                 try:
-                    with Image.open(meta["file_path"]) as image:
+                    with Image.open(abs_path) as image:
                         images.append(image.convert("RGB"))
-                    valid_batch_meta.append(meta)
+                    valid_batch_meta.append({**meta, "_abs_path": abs_path})
                 except (FileNotFoundError, OSError):
                     logger.warning(
                         "Skipping unreadable frame %s during indexing",
-                        meta["file_path"],
+                        abs_path,
                         exc_info=True,
                     )
 
@@ -107,7 +120,7 @@ class Indexer:
                 data_to_insert.append(
                     {
                         "timestamp_ns": meta["timestamp_ns"],
-                        "file_path": meta["file_path"],
+                        "file_path": meta["_abs_path"],
                         "topic": metadata["topic"],
                         "vector": emb,
                     }
@@ -119,14 +132,12 @@ class Indexer:
 
         logger.info("Writing embeddings to LanceDB...")
         if table_name in db.list_tables():
-            table = db.open_table(table_name)
-            table.add(data_to_insert)
-        else:
-            table = db.create_table(table_name, data=data_to_insert)
+            logger.info("Existing index found; overwriting table.")
+        db.create_table(table_name, data=data_to_insert, mode="overwrite")
 
         logger.info(
-            "Index successfully built! Total records in table: %s (Showing sample limit)",
-            len(table.search().limit(10).to_list()),
+            "Index successfully built! Total records in table: %d",
+            len(data_to_insert),
         )
 
         self.model.cpu()

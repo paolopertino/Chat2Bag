@@ -13,3 +13,9 @@ models:
   orchestration_llm: "gemma-2-9b"
   video_vlm: "qwen3-vl:2b" # "qwen3-vl:4b"                                                  # The model used for video understanding and question answering. You can choose among Ollama's video-capable models, such as "qwen3-vl:2b".
   model_storage: "models"                                                                   # Directory name where downloaded models checkpoints will be stored.
+
+search:
+  temporal_dedup_window_sec: 20.0                                                             # Suppress lower-scoring hits from the same bag/topic sequence within +/- this temporal window around a better-scoring frame.
+
+api:
+  scan_timeout_sec: 30.0                                                                      # Maximum seconds allowed for a recursive bag directory scan before returning 504.

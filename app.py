@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +18,7 @@ from src.api import (
     indexing_router,
     search_router,
 )
+from src.api.state import indexing_status
 from src.core import get_app_config
 from src.services.component_factory import BackendComponentFactory
 from src.utils.logging_utils import setup_logging
@@ -46,6 +48,18 @@ async def lifespan(fastapi_app: FastAPI):
     logger.info("Server starting up")
     config = get_app_config()
 
+    # Reset any bags left in "indexing" state from a previous crashed run.
+    stuck_bags = [k for k, v in indexing_status.items() if v == "indexing"]
+    for bag_path in stuck_bags:
+        logger.warning(
+            "Resetting stuck indexing status to 'error' for bag: %s", bag_path
+        )
+        indexing_status[bag_path] = "error"
+
+    # Resolve compute device once at startup and share across all components.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info("Using compute device: %s", device)
+
     model_checkpoints_path = config.models.model_storage
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
@@ -55,7 +69,7 @@ async def lifespan(fastapi_app: FastAPI):
             os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
     except (OSError, ValueError):
-        print("Downloading embedding model for the first time...")
+        logger.info("Downloading embedding model for the first time...")
         embedding_model = AutoModel.from_pretrained(config.models.embedding_model)
         embedding_model.save_pretrained(
             os.path.join(model_checkpoints_path, config.models.embedding_model)
@@ -66,7 +80,7 @@ async def lifespan(fastapi_app: FastAPI):
             os.path.join(model_checkpoints_path, config.models.embedding_model)
         )
     except (OSError, ValueError):
-        print("Downloading embedding model processor for the first time...")
+        logger.info("Downloading embedding model processor for the first time...")
         embedding_model_processor = AutoProcessor.from_pretrained(
             config.models.embedding_model
         )
@@ -82,6 +96,7 @@ async def lifespan(fastapi_app: FastAPI):
         config=config,
         embedding_model=embedding_model,
         embedding_processor=embedding_model_processor,
+        device=device,
     )
 
     fastapi_app.state.searcher_instance = (

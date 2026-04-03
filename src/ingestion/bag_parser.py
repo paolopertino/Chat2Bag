@@ -11,6 +11,7 @@ from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,12 @@ class BagParser:
         """Reads the bag and extracts downsampled frames to the artifact folder."""
         logger.info("Opening bag: %s", self.bag_path.name)
 
-        metadata = {"bag_name": self.bag_path.name, "topic": self.topic, "frames": []}
+        metadata = {
+            "schema_version": METADATA_SCHEMA_VERSION,
+            "bag_name": self.bag_path.name,
+            "topic": self.topic,
+            "frames": [],
+        }
 
         # Calculate the nanosecond interval based on desired FPS
         interval_ns = int((1.0 / self.fps) * 1e9)
@@ -78,7 +84,7 @@ class BagParser:
                         metadata["frames"].append(
                             {
                                 "timestamp_ns": timestamp_ns,
-                                "file_path": str(frame_path.resolve()),
+                                "file_path": str(frame_path.relative_to(self.artifact_dir)),
                             }
                         )
 

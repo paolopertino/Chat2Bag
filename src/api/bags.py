@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.state import indexing_status
+from src.core.app_config import get_app_config
 from src.core.settings import get_settings
 from src.core.storage import resolve_artifact_path
 
@@ -67,12 +69,21 @@ async def scan_bags(
             status_code=400, detail="root_dir must be an existing directory"
         )
 
-    bags: List[Dict[str, Any]] = []
-    bag_dirs = sorted(
-        _find_bag_dirs_recursive(root_path), key=lambda p: str(p.resolve())
-    )
-    for candidate in bag_dirs:
+    scan_timeout = get_app_config().api.scan_timeout_sec
+    loop = asyncio.get_event_loop()
+    try:
+        bag_dirs = await asyncio.wait_for(
+            loop.run_in_executor(None, _find_bag_dirs_recursive, root_path),
+            timeout=scan_timeout,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Scan timed out after {scan_timeout}s. Try a more specific root directory.",
+        ) from exc
 
+    bags: List[Dict[str, Any]] = []
+    for candidate in sorted(bag_dirs, key=lambda p: str(p.resolve())):
         lancedb_dir = _artifact_dir_for_bag(candidate) / "lancedb"
         bag_path = str(candidate.resolve())
         bags.append(
@@ -117,7 +128,8 @@ async def bag_frames(
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
-    metadata_path = _metadata_path_for_bag(path)
+    artifact_dir = _artifact_dir_for_bag(path)
+    metadata_path = artifact_dir / "metadata.json"
     if not metadata_path.exists() or not metadata_path.is_file():
         raise HTTPException(
             status_code=404, detail="Bag metadata not found. Index the bag first."
@@ -131,7 +143,7 @@ async def bag_frames(
     frames = [
         {
             "timestamp_ns": frame["timestamp_ns"],
-            "file_path": frame["file_path"],
+            "file_path": str(artifact_dir / frame["file_path"]),
         }
         for frame in metadata.get("frames", [])
         if start_ns <= frame.get("timestamp_ns", -1) <= end_ns

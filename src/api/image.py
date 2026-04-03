@@ -8,11 +8,13 @@ from src.core.settings import get_settings
 
 router = APIRouter(prefix="/api", tags=["images"])
 
-_FRAME_PATTERN = re.compile(r"^.*/\.bag_chat/thumbnails/frame_\d+\.jpg$")
-
 _SETTINGS = get_settings()
 
 _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
+
+_FRAME_PATTERN = re.compile(
+    r"^.*/" + re.escape(_ARTIFACT_DIR_NAME) + r"/thumbnails/frame_\d+\.jpg$"
+)
 
 
 @router.get("/image")

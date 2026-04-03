@@ -28,10 +28,22 @@ class ModelsConfig:
 
 
 @dataclass(frozen=True)
+class SearchConfig:
+    temporal_dedup_window_sec: float
+
+
+@dataclass(frozen=True)
+class ApiConfig:
+    scan_timeout_sec: float
+
+
+@dataclass(frozen=True)
 class AppConfig:
     ingestion: IngestionConfig
     storage: StorageConfig
     models: ModelsConfig
+    search: SearchConfig
+    api: ApiConfig
 
 
 @lru_cache(maxsize=1)
@@ -54,5 +66,15 @@ def get_app_config() -> AppConfig:
             orchestration_llm=str(settings["models"]["orchestration_llm"]),
             video_vlm=str(settings["models"]["video_vlm"]),
             model_storage=str(settings["models"]["model_storage"]),
+        ),
+        search=SearchConfig(
+            temporal_dedup_window_sec=float(
+                settings.get("search", {}).get("temporal_dedup_window_sec", 0.0)
+            ),
+        ),
+        api=ApiConfig(
+            scan_timeout_sec=float(
+                settings.get("api", {}).get("scan_timeout_sec", 30.0)
+            ),
         ),
     )
