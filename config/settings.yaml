@@ -19,3 +19,26 @@ search:
 
 api:
   scan_timeout_sec: 30.0                                                                      # Maximum seconds allowed for a recursive bag directory scan before returning 504.
+
+extraction:
+  service_url: http://localhost:8765                                                                          # URL of the dataset-generation microservice. Set to null to disable the feature entirely.
+  request_timeout_sec: 10.0                                                                   # Timeout (seconds) for requests to the extraction microservice.
+  default_output_subdir: "nuscenes_extractions"                                               # Subdirectory (under each bag's artifact dir) where NuScenes datasets are written.
+  # Fields the user can edit in the UI. All other fields are either inherited from the
+  # microservice defaults or overridden by fixed_overrides below.
+  editable_fields:
+    - calibration_path
+    - frames_path
+    - target_lidar_frame
+    - sync_threshold
+    - n_workers
+    - save_on_disk
+    - topics
+  # Strip this prefix from bag paths before forwarding to the microservice.
+  # Useful when the service runs in Docker with a different mount point (e.g. /adehome → /).
+  path_strip_prefix: "/adehome"
+  # Values injected server-side on every extraction request. Users cannot override these.
+  fixed_overrides:
+    bag_type: mcap
+    append_dataset: false
+    debug: false

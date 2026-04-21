@@ -14,6 +14,7 @@ from transformers import AutoProcessor, AutoModel
 from src.api import (
     bags_router,
     chat_router,
+    datasets_router,
     image_router,
     indexing_router,
     search_router,
@@ -103,6 +104,11 @@ async def lifespan(fastapi_app: FastAPI):
         fastapi_app.state.component_factory.create_global_searcher()
     )
 
+    if config.extraction.enabled:
+        logger.info("Dataset extraction enabled, service URL: %s", config.extraction.service_url)
+    else:
+        logger.info("Dataset extraction disabled (no service_url configured)")
+
     yield
 
     logger.info("Server shutting down: clearing model resources")
@@ -133,6 +139,7 @@ app.include_router(image_router)
 app.include_router(indexing_router)
 app.include_router(search_router)
 app.include_router(chat_router)
+app.include_router(datasets_router)
 
 
 static_dir = Path("static")

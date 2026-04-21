@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { LoaderCircle, MessageSquareText, X } from "lucide-react";
+import { Database, LoaderCircle, MessageSquareText, X } from "lucide-react";
 
 import { getImageUrl } from "../../api/client";
 import type { FrameInfo, SearchResult } from "../../api/types";
@@ -19,6 +19,7 @@ interface SequenceViewerProps {
   chatDuration: number;
   chatQuery: string;
   chatResponse: string | null;
+  extractionEnabled: boolean;
   frames: FrameInfo[];
   isExtendingLeft: boolean;
   isExtendingRight: boolean;
@@ -30,6 +31,7 @@ interface SequenceViewerProps {
   onChatDurationChange: (value: number) => void;
   onChatQueryChange: (value: string) => void;
   onClose: () => void;
+  onExtractDataset: () => void;
   onLoadMoreLeft: () => Promise<FrameInfo[] | null>;
   onLoadMoreRight: () => Promise<FrameInfo[] | null>;
   onSelectNextFrame: () => Promise<void>;
@@ -49,6 +51,7 @@ export function SequenceViewer({
   chatDuration,
   chatQuery,
   chatResponse,
+  extractionEnabled,
   frames,
   isExtendingLeft,
   isExtendingRight,
@@ -60,6 +63,7 @@ export function SequenceViewer({
   onChatDurationChange,
   onChatQueryChange,
   onClose,
+  onExtractDataset,
   onLoadMoreLeft,
   onLoadMoreRight,
   onSelectNextFrame,
@@ -372,10 +376,24 @@ export function SequenceViewer({
                   />
                 </div>
 
-                <Button type="button" onClick={onChat} disabled={isChatting} className="w-full">
-                  {isChatting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isChatting ? "Asking VLM" : "Ask VLM"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" onClick={onChat} disabled={isChatting} className="flex-1">
+                    {isChatting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isChatting ? "Asking VLM" : "Ask VLM"}
+                  </Button>
+                  {extractionEnabled ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={onExtractDataset}
+                      disabled={selectedTimestampNs === null}
+                      title="Extract this window as a NuScenes dataset"
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      Extract Dataset
+                    </Button>
+                  ) : null}
+                </div>
 
                 <div className="min-h-24 rounded-xl border border-[var(--line)] bg-[var(--bg-paper)] p-4 text-sm leading-6 text-[var(--ink-soft)]">
                   {chatResponse ?? "Pick a frame in the timeline, ask a question, and the VLM response will appear here."}

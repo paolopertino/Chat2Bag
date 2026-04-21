@@ -1,6 +1,11 @@
 import type {
   ChatResponse,
   BagStatusResponse,
+  ExtractionConfigSchema,
+  ExtractionJob,
+  ExtractionLogsResponse,
+  ExtractionSubmitRequest,
+  ExtractionSubmitResponse,
   FramesResponse,
   ScanBagsResponse,
   SearchResponse,
@@ -122,4 +127,40 @@ export async function chatWithClip(payload: ChatRequest): Promise<ChatResponse> 
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ---- Dataset extraction API ----
+
+export async function getExtractionSchema(): Promise<ExtractionConfigSchema> {
+  return http<ExtractionConfigSchema>("/api/datasets/config/schema");
+}
+
+export async function submitExtraction(
+  payload: ExtractionSubmitRequest,
+): Promise<ExtractionSubmitResponse> {
+  return http<ExtractionSubmitResponse>("/api/datasets/extract", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listExtractionJobs(): Promise<ExtractionJob[]> {
+  return http<ExtractionJob[]>("/api/datasets/jobs");
+}
+
+export async function getExtractionJob(jobId: string): Promise<ExtractionJob> {
+  return http<ExtractionJob>(`/api/datasets/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export async function cancelExtractionJob(jobId: string): Promise<ExtractionJob> {
+  return http<ExtractionJob>(`/api/datasets/jobs/${encodeURIComponent(jobId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getExtractionLogs(jobId: string, tail = 500): Promise<string[]> {
+  const resp = await http<ExtractionLogsResponse>(
+    `/api/datasets/jobs/${encodeURIComponent(jobId)}/logs?tail=${tail}`,
+  );
+  return resp.lines;
 }
