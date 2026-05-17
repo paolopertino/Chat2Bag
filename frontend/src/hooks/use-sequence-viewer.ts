@@ -297,6 +297,45 @@ export function useSequenceViewer() {
     }
   }, [canLoadMoreRight, frames, loadMoreRight, selectedTimestampNs]);
 
+  const jumpToTimestamp = useCallback(
+    async (ns: number) => {
+      const withinLoaded =
+        loadedRangeStartNs !== null &&
+        loadedRangeEndNs !== null &&
+        ns >= loadedRangeStartNs &&
+        ns <= loadedRangeEndNs;
+
+      if (withinLoaded) {
+        const nearest = getNearestFrameTimestamp(frames, ns);
+        setSelectedTimestampNs(nearest ?? ns);
+        return;
+      }
+
+      if (!selectedResult) return;
+
+      const windowStartNs = Math.max(0, Math.floor(ns - HALF_WINDOW_NS));
+      const requestId = viewerLoadRequestIdRef.current + 1;
+      viewerLoadRequestIdRef.current = requestId;
+
+      setIsLoadingFrames(true);
+      setSelectedTimestampNs(ns);
+      setLoadedRangeStartNs(null);
+      setLoadedRangeEndNs(null);
+      setCanLoadMoreLeft(true);
+      setCanLoadMoreRight(true);
+
+      await loadViewerFrames({
+        bagPath: selectedResult.bag_path,
+        requestStartNs: windowStartNs,
+        durationSec: DEFAULT_WINDOW_SECONDS,
+        preferredSelectedNs: ns,
+        requestId,
+        reconcileSelection: true,
+      });
+    },
+    [frames, loadedRangeStartNs, loadedRangeEndNs, loadViewerFrames, selectedResult],
+  );
+
   const runChat = useCallback(async () => {
     if (!selectedResult || selectedTimestampNs === null) {
       return;

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Search } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import type { SearchResult } from "../../api/types";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
+import { AuthImage } from "../ui/auth-image";
 
 function formatTimestampNs(ns: number): string {
   const ms = Math.floor(ns / 1_000_000);
@@ -12,35 +14,45 @@ function formatTimestampNs(ns: number): string {
 
 interface ImageCardProps {
   result: SearchResult;
-  imageUrl: string;
+  /** When provided, renders the image area as a `<Link>` so Cmd/Ctrl-click opens a new tab. */
+  href?: string;
   onClick?: () => void;
   onSimilarSearch?: (result: SearchResult) => void;
 }
 
-export function ImageCard({ result, imageUrl, onClick, onSimilarSearch }: ImageCardProps) {
+export function ImageCard({ result, href, onClick, onSimilarSearch }: ImageCardProps) {
+  const filePath = result.file_path;
   const [hasImageError, setHasImageError] = useState(false);
+  const handleImageError = useCallback(() => setHasImageError(true), []);
+
+  const imageArea = hasImageError ? (
+    <div className="flex aspect-video w-full items-center justify-center bg-[var(--bg-sand)] text-sm text-[var(--ink-soft)]">
+      Preview unavailable
+    </div>
+  ) : (
+    <AuthImage
+      filePath={filePath}
+      alt={`Search result from ${result.source_bag}`}
+      onError={handleImageError}
+      className="aspect-video w-full bg-[var(--bg-sand)] object-cover"
+    />
+  );
 
   return (
     <Card className="overflow-hidden transition hover:-translate-y-0.5">
-      <button
-        type="button"
-        onClick={onClick}
-        className="block w-full cursor-pointer text-left"
-      >
-        {hasImageError ? (
-          <div className="flex aspect-video w-full items-center justify-center bg-[var(--bg-sand)] text-sm text-[var(--ink-soft)]">
-            Preview unavailable
-          </div>
-        ) : (
-          <img
-            src={imageUrl}
-            alt={`Search result from ${result.source_bag}`}
-            loading="lazy"
-            onError={() => setHasImageError(true)}
-            className="aspect-video w-full bg-[var(--bg-sand)] object-cover"
-          />
-        )}
-      </button>
+      {href ? (
+        <Link to={href} className="block w-full text-left">
+          {imageArea}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onClick}
+          className="block w-full cursor-pointer text-left"
+        >
+          {imageArea}
+        </button>
+      )}
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">

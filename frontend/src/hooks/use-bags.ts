@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { getBagStatus, indexBag, scanBags } from "../api/client";
@@ -6,7 +6,7 @@ import type { BagInfo } from "../api/types";
 
 const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
 
-export function useBags() {
+export function useBagsState() {
   const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
   const [bags, setBags] = useState<BagInfo[]>([]);
   const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
@@ -106,6 +106,15 @@ export function useBags() {
   useEffect(() => {
     window.localStorage.setItem(ROOT_DIR_STORAGE_KEY, rootDir);
   }, [rootDir]);
+
+  // Auto-scan on mount when rootDir is already persisted from a previous session.
+  const autoScannedRef = useRef(false);
+  useEffect(() => {
+    if (autoScannedRef.current || !rootDir.trim()) return;
+    autoScannedRef.current = true;
+    void onScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     rootDir,

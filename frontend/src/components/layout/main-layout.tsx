@@ -1,25 +1,36 @@
-import type { PropsWithChildren, ReactNode } from "react";
+import { Outlet } from "react-router-dom";
 
-interface MainLayoutProps extends PropsWithChildren {
-  sidebar: ReactNode;
-  header: ReactNode;
+import { SidebarSlotProvider, useSidebarSlotContent } from "./sidebar-slot";
+import { TopBar } from "./top-bar";
+
+function LayoutBody() {
+  const sidebar = useSidebarSlotContent();
+  const hasSidebar = sidebar !== null;
+
+  return (
+    <div
+      className={
+        "grid min-h-[calc(100vh-theme(spacing.14))] w-full gap-6 px-6 py-6 " +
+        (hasSidebar ? "lg:grid-cols-[320px_1fr]" : "lg:grid-cols-1")
+      }
+    >
+      {hasSidebar ? (
+        <aside className="self-start lg:sticky lg:top-6">{sidebar}</aside>
+      ) : null}
+      <main className="min-w-0">
+        <Outlet />
+      </main>
+    </div>
+  );
 }
 
-export function MainLayout({ sidebar, header, children }: MainLayoutProps) {
+export function MainLayout() {
   return (
-    <div className="mx-auto max-w-[1500px] px-4 py-6 md:px-6 lg:px-8">
-      <div className="mb-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--teal)]">AIDA Bag GPT</p>
-        <h1 className="text-3xl font-bold leading-tight md:text-4xl">Semantic Frame Search for ROS2 Bags</h1>
+    <SidebarSlotProvider>
+      <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
+        <TopBar />
+        <LayoutBody />
       </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[360px_1fr]">
-        <aside>{sidebar}</aside>
-        <main className="space-y-4">
-          {header}
-          {children}
-        </main>
-      </div>
-    </div>
+    </SidebarSlotProvider>
   );
 }
