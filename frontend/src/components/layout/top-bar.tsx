@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../context/auth-context";
 import { Button } from "../ui/button";
+import { JobsDropdown } from "./jobs-dropdown";
 
 export function TopBar() {
   const { username, logout } = useAuth();
@@ -13,6 +14,7 @@ export function TopBar() {
         Bag-GPT
       </Link>
       <div className="flex items-center gap-3">
+        <JobsDropdown />
         {username ? (
           <span className="text-sm text-[var(--ink-soft)]">{username}</span>
         ) : null}

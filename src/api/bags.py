@@ -121,6 +121,38 @@ async def bag_status(
     return {"bag_path": resolved_path, "status": status}
 
 
+@router.get("/info")
+async def bag_info(
+    bag_path: str = Query(..., description="Absolute path of bag directory"),
+):
+    """Aggregate metadata for a bag: frame_count + first/last timestamp."""
+    path = Path(bag_path).expanduser().resolve()
+    if not path.exists() or not path.is_dir():
+        raise HTTPException(status_code=404, detail="Bag path does not exist")
+
+    metadata_path = _metadata_path_for_bag(path)
+    if not metadata_path.exists() or not metadata_path.is_file():
+        raise HTTPException(
+            status_code=404, detail="Bag metadata not found. Index the bag first."
+        )
+
+    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
+        metadata = json.load(metadata_handle)
+
+    timestamps = [
+        frame["timestamp_ns"]
+        for frame in metadata.get("frames", [])
+        if "timestamp_ns" in frame
+    ]
+
+    return {
+        "bag_path": str(path),
+        "frame_count": len(timestamps),
+        "first_timestamp_ns": min(timestamps) if timestamps else None,
+        "last_timestamp_ns": max(timestamps) if timestamps else None,
+    }
+
+
 @router.get("/frames")
 async def bag_frames(
     bag_path: str = Query(..., description="Absolute path of bag directory"),
