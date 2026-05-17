@@ -5,9 +5,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_search_service
+from src.auth.dependencies import require_current_user
 from src.services.search_service import SearchService
 
-router = APIRouter(prefix="/api", tags=["search"])
+router = APIRouter(
+    prefix="/api",
+    tags=["search"],
+    dependencies=[Depends(require_current_user)],
+)
 
 
 class SearchRequest(BaseModel):

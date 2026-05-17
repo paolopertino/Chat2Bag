@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from transformers import AutoProcessor, AutoModel
 
 from src.api import (
+    auth_router,
     bags_router,
     chat_router,
     datasets_router,
@@ -47,6 +48,16 @@ def _get_cors_origins() -> list[str]:
 async def lifespan(fastapi_app: FastAPI):
     setup_logging(str(LOGGING_CONFIG_PATH))
     logger.info("Server starting up")
+
+    # Fail fast if auth secrets are missing.
+    for required_env in ("JWT_SECRET", "REFRESH_SECRET"):
+        if not os.environ.get(required_env):
+            raise RuntimeError(f"{required_env} environment variable is required")
+
+    # Ensure user DB exists (file + schema).
+    from src.auth.db import ensure_db_initialized
+    await ensure_db_initialized()
+
     config = get_app_config()
 
     # Reset any bags left in "indexing" state from a previous crashed run.
@@ -134,6 +145,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(bags_router)
 app.include_router(image_router)
 app.include_router(indexing_router)

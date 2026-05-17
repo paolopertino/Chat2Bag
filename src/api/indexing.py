@@ -5,9 +5,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_indexing_service
+from src.auth.dependencies import require_current_user
 from src.services.indexing_service import IndexingService
 
-router = APIRouter(prefix="/api", tags=["indexing"])
+router = APIRouter(
+    prefix="/api",
+    tags=["indexing"],
+    dependencies=[Depends(require_current_user)],
+)
 
 
 class IndexRequest(BaseModel):

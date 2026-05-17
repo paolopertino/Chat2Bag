@@ -4,14 +4,19 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.state import indexing_status
+from src.auth.dependencies import require_current_user
 from src.core.app_config import get_app_config
 from src.core.settings import get_settings
 from src.core.storage import resolve_artifact_path
 
-router = APIRouter(prefix="/api/bags", tags=["bags"])
+router = APIRouter(
+    prefix="/api/bags",
+    tags=["bags"],
+    dependencies=[Depends(require_current_user)],
+)
 
 _SETTINGS = get_settings()
 
