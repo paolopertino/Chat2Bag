@@ -1,5 +1,6 @@
 import type {
   ChatResponse,
+  BagInfoResponse,
   BagStatusResponse,
   ExtractionConfigSchema,
   ExtractionJob,
@@ -198,6 +199,10 @@ export async function indexBag(bagPath: string): Promise<void> {
 
 export async function getBagStatus(bagPath: string): Promise<BagStatusResponse> {
   return http<BagStatusResponse>(`/api/bags/status?bag_path=${encodeURIComponent(bagPath)}`);
+}
+
+export async function getBagInfo(bagPath: string): Promise<BagInfoResponse> {
+  return http<BagInfoResponse>(`/api/bags/info?bag_path=${encodeURIComponent(bagPath)}`);
 }
 
 export async function getFrames(
