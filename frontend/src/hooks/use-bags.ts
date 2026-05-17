@@ -12,6 +12,7 @@ export function useBagsState() {
   const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [lastScannedRootDir, setLastScannedRootDir] = useState<string | null>(null);
 
   const indexingBagPaths = useMemo(
     () => bags.filter((bag) => bag.status === "indexing").map((bag) => bag.bag_path),
@@ -19,14 +20,18 @@ export function useBagsState() {
   );
 
   const onScan = useCallback(async () => {
-    if (!rootDir.trim()) {
+    const trimmedRootDir = rootDir.trim();
+
+    if (!trimmedRootDir) {
       toast.error("Please enter a root directory.");
       return;
     }
 
+    setLastScannedRootDir(null);
     setIsScanning(true);
     try {
-      const data = await scanBags(rootDir.trim());
+      const data = await scanBags(trimmedRootDir);
+      setLastScannedRootDir(trimmedRootDir);
       setBags(data.bags);
       setSelectedBagPaths((prev) =>
         prev.filter((bagPath) => data.bags.some((bag) => bag.bag_path === bagPath)),
@@ -72,6 +77,18 @@ export function useBagsState() {
     }
   }, []);
 
+  const registerBag = useCallback((bag: BagInfo) => {
+    setBags((prev) => {
+      if (prev.some((b) => b.bag_path === bag.bag_path)) return prev;
+      return [...prev, bag];
+    });
+  }, []);
+
+  const unregisterBag = useCallback((bagPath: string) => {
+    setBags((prev) => prev.filter((b) => b.bag_path !== bagPath));
+    setSelectedBagPaths((prev) => prev.filter((p) => p !== bagPath));
+  }, []);
+
   useEffect(() => {
     if (indexingBagPaths.length === 0) {
       setIsPolling(false);
@@ -92,6 +109,7 @@ export function useBagsState() {
               ...bag,
               status: next.status,
               is_indexed: next.status === "done" || bag.is_indexed,
+              error_message: next.error_message ?? null,
             };
           }),
         );
@@ -123,9 +141,12 @@ export function useBagsState() {
     selectedBagPaths,
     isScanning,
     isPolling,
+    lastScannedRootDir,
     onScan,
     onIndex,
     toggleBagSelection,
     toggleAllBags,
+    registerBag,
+    unregisterBag,
   };
 }

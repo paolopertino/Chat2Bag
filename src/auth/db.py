@@ -114,3 +114,4 @@ async def list_users() -> list[User]:
         return [
             User(id=row[0], username=row[1], is_active=bool(row[2])) for row in rows
         ]
+

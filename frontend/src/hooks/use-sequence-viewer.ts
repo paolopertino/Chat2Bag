@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { chatWithClip, getFrames } from "../api/client";
@@ -50,7 +50,21 @@ function computeClipWindow(
   };
 }
 
+function getNearestFrameTimestamp(frames: FrameInfo[], targetNs: number): number | null {
+  if (frames.length === 0) {
+    return null;
+  }
+
+  const firstAtOrAfter = frames.find((frame) => frame.timestamp_ns >= targetNs);
+  if (firstAtOrAfter) {
+    return firstAtOrAfter.timestamp_ns;
+  }
+
+  return frames[frames.length - 1].timestamp_ns;
+}
+
 export function useSequenceViewer() {
+  const viewerLoadRequestIdRef = useRef(0);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [frames, setFrames] = useState<FrameInfo[]>([]);
   const [selectedTimestampNs, setSelectedTimestampNs] = useState<number | null>(null);
@@ -115,6 +129,7 @@ export function useSequenceViewer() {
   }, [frames, selectedResult, selectedTimestampNs]);
 
   const closeViewer = useCallback(() => {
+    viewerLoadRequestIdRef.current += 1;
     setSelectedResult(null);
     setFrames([]);
     setSelectedTimestampNs(null);
@@ -127,11 +142,9 @@ export function useSequenceViewer() {
     setChatDuration(DEFAULT_WINDOW_SECONDS);
   }, []);
 
-  const openViewer = useCallback(async (result: SearchResult) => {
-    const windowStartNs = Math.max(0, Math.floor(result.timestamp_ns - HALF_WINDOW_NS));
-
+  const resetViewerState = useCallback((result: SearchResult, selectedNs: number) => {
     setSelectedResult(result);
-    setSelectedTimestampNs(result.timestamp_ns);
+    setSelectedTimestampNs(selectedNs);
     setFrames([]);
     setLoadedRangeStartNs(null);
     setLoadedRangeEndNs(null);
@@ -141,26 +154,112 @@ export function useSequenceViewer() {
     setChatResponse(null);
     setChatDuration(DEFAULT_WINDOW_SECONDS);
     setIsLoadingFrames(true);
-
-    try {
-      const response = await getFrames(result.bag_path, windowStartNs, DEFAULT_WINDOW_SECONDS);
-      const sortedFrames = response.frames.sort((a, b) => a.timestamp_ns - b.timestamp_ns);
-      setFrames(sortedFrames);
-      const defaultEndNs = windowStartNs + DEFAULT_WINDOW_SECONDS * 1_000_000_000;
-      if (sortedFrames.length > 0) {
-        setLoadedRangeStartNs(sortedFrames[0].timestamp_ns);
-        setLoadedRangeEndNs(sortedFrames[sortedFrames.length - 1].timestamp_ns);
-      } else {
-        setLoadedRangeStartNs(windowStartNs);
-        setLoadedRangeEndNs(defaultEndNs);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load sequence frames.";
-      toast.error(message);
-    } finally {
-      setIsLoadingFrames(false);
-    }
   }, []);
+
+  const loadViewerFrames = useCallback(
+    async ({
+      bagPath,
+      requestStartNs,
+      durationSec,
+      preferredSelectedNs,
+      requestId,
+      reconcileSelection = false,
+    }: {
+      bagPath: string;
+      requestStartNs: number;
+      durationSec: number;
+      preferredSelectedNs: number;
+      requestId: number;
+      reconcileSelection?: boolean;
+    }) => {
+      const isStale = () => viewerLoadRequestIdRef.current !== requestId;
+
+      try {
+        const response = await getFrames(bagPath, requestStartNs, durationSec);
+        if (isStale()) {
+          return;
+        }
+        const sortedFrames = response.frames.sort((a, b) => a.timestamp_ns - b.timestamp_ns);
+        setFrames(sortedFrames);
+        const defaultEndNs = requestStartNs + durationSec * 1_000_000_000;
+        if (sortedFrames.length > 0) {
+          setLoadedRangeStartNs(sortedFrames[0].timestamp_ns);
+          setLoadedRangeEndNs(sortedFrames[sortedFrames.length - 1].timestamp_ns);
+
+          if (reconcileSelection) {
+            const nextSelectedNs =
+              getNearestFrameTimestamp(sortedFrames, preferredSelectedNs) ?? preferredSelectedNs;
+            setSelectedTimestampNs(nextSelectedNs);
+          }
+        } else {
+          setLoadedRangeStartNs(requestStartNs);
+          setLoadedRangeEndNs(defaultEndNs);
+        }
+      } catch (error) {
+        if (isStale()) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "Failed to load sequence frames.";
+        toast.error(message);
+      } finally {
+        if (!isStale()) {
+          setIsLoadingFrames(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const openViewer = useCallback(async (result: SearchResult) => {
+    const windowStartNs = Math.max(0, Math.floor(result.timestamp_ns - HALF_WINDOW_NS));
+    const requestId = viewerLoadRequestIdRef.current + 1;
+    viewerLoadRequestIdRef.current = requestId;
+
+    resetViewerState(result, result.timestamp_ns);
+    await loadViewerFrames({
+      bagPath: result.bag_path,
+      requestStartNs: windowStartNs,
+      durationSec: DEFAULT_WINDOW_SECONDS,
+      preferredSelectedNs: result.timestamp_ns,
+      requestId,
+    });
+  }, [loadViewerFrames, resetViewerState]);
+
+  const openViewerForBag = useCallback(
+    async ({
+      bagPath,
+      bagName,
+      startNs,
+      durationSec = DEFAULT_WINDOW_SECONDS,
+    }: {
+      bagPath: string;
+      bagName: string;
+      startNs: number;
+      durationSec?: number;
+    }) => {
+      const synthetic: SearchResult = {
+        bag_path: bagPath,
+        timestamp_ns: startNs,
+        file_path: "",
+        topic: "",
+        similarity_score: 0,
+        source_bag: bagName,
+      };
+      const requestId = viewerLoadRequestIdRef.current + 1;
+      viewerLoadRequestIdRef.current = requestId;
+
+      resetViewerState(synthetic, startNs);
+      await loadViewerFrames({
+        bagPath,
+        requestStartNs: startNs,
+        durationSec,
+        preferredSelectedNs: startNs,
+        requestId,
+        reconcileSelection: true,
+      });
+    },
+    [loadViewerFrames, resetViewerState],
+  );
 
   const loadMoreLeft = useCallback(async (): Promise<FrameInfo[] | null> => {
     if (!selectedResult || isLoadingFrames || isExtendingLeft || !canLoadMoreLeft) {
@@ -389,9 +488,11 @@ export function useSequenceViewer() {
     isFrameInVlmWindow,
     isLoadingFrames,
     isOpen,
+    jumpToTimestamp,
     loadMoreLeft,
     loadMoreRight,
     openViewer,
+    openViewerForBag,
     runChat,
     selectNextFrame,
     selectPreviousFrame,

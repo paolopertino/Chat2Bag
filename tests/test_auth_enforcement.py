@@ -35,3 +35,4 @@ def test_router_requires_auth(unauthenticated_client_for, router, method, path):
     client = unauthenticated_client_for(router)
     response = client.request(method, path)
     assert response.status_code == 401
+

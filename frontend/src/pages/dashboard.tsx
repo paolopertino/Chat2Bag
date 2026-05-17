@@ -30,7 +30,7 @@ const SECTIONS: SectionCard[] = [
     title: "Bag Explorer",
     description: "Browse indexed bags, inspect frames, and trigger dataset extraction.",
     href: "/bags",
-    status: "coming-soon",
+    status: "available",
   },
   {
     title: "Workspace (legacy)",

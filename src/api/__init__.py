@@ -15,3 +15,4 @@ __all__ = [
     "indexing_router",
     "search_router",
 ]
+

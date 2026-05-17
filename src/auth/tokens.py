@@ -51,3 +51,4 @@ def create_refresh_token(username: str, ttl_seconds: int) -> str:
 def decode_refresh_token(token: str) -> dict[str, Any]:
     secret = _require_secret("REFRESH_SECRET")
     return _decode(token, secret, expected_type="refresh")
+

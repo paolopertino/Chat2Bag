@@ -110,7 +110,7 @@ Order, left-to-right:
 Compact summary chip below the header row. Two states:
 
 - **Collapsed** (default): one-line summary "K=10 · ≥0.30 · ⚙ Adjust" on the left, "<n> hits · <m> bags" status on the right.
-- **Expanded** (after clicking ⚙ Adjust): the chip grows in place into a row with two sliders (`Top K` 1–100 default 10; `Min similarity` 0.0–1.0 default 0). Outside-click collapses.
+- **Expanded** (after clicking ⚙ Adjust): the chip grows in place into a row with two sliders (`Top K` 1–100 default 25; `Min similarity` 0.0–1.0 default 0). Outside-click collapses.
 
 Slider drags fire on `onChange`:
 - `topK` change → re-fetches via `useSearch.runSearch` (server-side parameter).

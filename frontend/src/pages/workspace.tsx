@@ -9,8 +9,8 @@ import { Sidebar } from "../components/layout/sidebar";
 import { ResultsGrid } from "../components/search/results-grid";
 import { SequenceViewer } from "../components/search/sequence-viewer";
 import { SearchBar } from "../components/search/search-bar";
+import { useJobs } from "../context/jobs-context";
 import { useBags } from "../context/bags-context";
-import { useExtractionJobs } from "../hooks/use-extraction-jobs";
 import { useExtractionLauncher } from "../hooks/use-extraction-launcher";
 import { useSearch } from "../hooks/use-search";
 import { useSequenceViewer } from "../hooks/use-sequence-viewer";
@@ -80,7 +80,7 @@ export function WorkspacePage() {
     refresh: refreshJobs,
     cancelJob,
     fetchLogs,
-  } = useExtractionJobs();
+  } = useJobs();
 
   const {
     isOpen: isExtractOpen,

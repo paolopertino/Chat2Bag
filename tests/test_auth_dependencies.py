@@ -63,3 +63,4 @@ async def test_protected_rejects_unknown_user(configured, app):
     token = create_access_token(username="ghost", ttl_seconds=60)
     response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
+

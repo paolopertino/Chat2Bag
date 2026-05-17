@@ -100,3 +100,4 @@ async def refresh(
 async def logout(response: Response) -> dict[str, str]:
     _clear_refresh_cookie(response)
     return {"status": "logged_out"}
+

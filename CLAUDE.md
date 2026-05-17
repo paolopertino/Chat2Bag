@@ -135,4 +135,3 @@ Phase 2 MUST preserve `/workspace` as a working fallback until Phase 4 completes
 
 ---
 **Last Updated**: 2026-04-24 (Phase 1 shipped on `frontend-refactor`; Phase 2 pending spec)
-
