@@ -13,14 +13,15 @@ from src.embedding.registry import register_embedder
 class Siglip2Embedder(FrameEmbedder):
     """SigLIP-2 backend. Wraps the original AutoModel/AutoProcessor code paths."""
 
-    def __init__(self, config):
+    def __init__(self, config, device: str = "cpu"):
         self._model_id = config.embedding.model
         self._storage = config.models.model_storage
         self._batch_hint = max(1, int(config.ingestion.batch_size))
-        self._device = "cpu"
+        self._device = device
 
         self._model = self._load(AutoModel)
         self._processor = self._load(AutoProcessor)
+        self._model.to(device)
         self._model.eval()
 
         # Derive embedding_dim from a real forward pass — model-agnostic, never wrong.

@@ -77,7 +77,7 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    embedder = create_embedder(config).to(device)
+    embedder = create_embedder(config, device=device)
     logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config
