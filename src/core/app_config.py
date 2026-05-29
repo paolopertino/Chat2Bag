@@ -8,9 +8,9 @@ from src.core.settings import get_settings
 
 @dataclass(frozen=True)
 class IngestionConfig:
-    camera_topic: str
+    camera_topics: tuple[str, ...]
     sampling_fps: float
-    max_image_size: tuple[int, int]
+    long_side: int
     batch_size: int
 
 
@@ -22,10 +22,15 @@ class StorageConfig:
 
 @dataclass(frozen=True)
 class ModelsConfig:
-    embedding_model: str
     orchestration_llm: str
     video_vlm: str
     model_storage: str
+
+
+@dataclass(frozen=True)
+class EmbeddingConfig:
+    backend: str
+    model: str
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class AppConfig:
     ingestion: IngestionConfig
     storage: StorageConfig
     models: ModelsConfig
+    embedding: EmbeddingConfig
     search: SearchConfig
     api: ApiConfig
     extraction: ExtractionConfig
@@ -68,9 +74,9 @@ def get_app_config() -> AppConfig:
 
     return AppConfig(
         ingestion=IngestionConfig(
-            camera_topic=str(settings["ingestion"]["camera_topic"]),
+            camera_topics=tuple(str(t) for t in settings["ingestion"]["camera_topics"]),
             sampling_fps=float(settings["ingestion"]["sampling_fps"]),
-            max_image_size=tuple(settings["ingestion"]["max_image_size"]),
+            long_side=int(settings["ingestion"]["long_side"]),
             batch_size=int(settings["ingestion"]["batch_size"]),
         ),
         storage=StorageConfig(
@@ -78,10 +84,13 @@ def get_app_config() -> AppConfig:
             storage_path=str(settings["storage"]["storage_path"]) if settings["storage"]["storage_path"] is not None else None
         ),
         models=ModelsConfig(
-            embedding_model=str(settings["models"]["embedding_model"]),
             orchestration_llm=str(settings["models"]["orchestration_llm"]),
             video_vlm=str(settings["models"]["video_vlm"]),
             model_storage=str(settings["models"]["model_storage"]),
+        ),
+        embedding=EmbeddingConfig(
+            backend=str(settings["embedding"]["backend"]),
+            model=str(settings["embedding"]["model"]),
         ),
         search=SearchConfig(
             temporal_dedup_window_sec=float(
