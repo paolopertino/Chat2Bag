@@ -9,7 +9,6 @@ import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from transformers import AutoProcessor, AutoModel
 
 from src.api import (
     auth_router,
@@ -69,6 +68,8 @@ async def lifespan(fastapi_app: FastAPI):
         indexing_status[bag_path] = "error"
 
     # Resolve compute device once at startup and share across all components.
+    from src.embedding import create_embedder
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Using compute device: %s", device)
 
@@ -76,39 +77,15 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    try:
-        embedding_model = AutoModel.from_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-    except (OSError, ValueError):
-        logger.info("Downloading embedding model for the first time...")
-        embedding_model = AutoModel.from_pretrained(config.models.embedding_model)
-        embedding_model.save_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-
-    try:
-        embedding_model_processor = AutoProcessor.from_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-    except (OSError, ValueError):
-        logger.info("Downloading embedding model processor for the first time...")
-        embedding_model_processor = AutoProcessor.from_pretrained(
-            config.models.embedding_model
-        )
-        embedding_model_processor.save_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
+    embedder = create_embedder(config).to(device)
+    logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config
-    fastapi_app.state.embedding_model = embedding_model
-    fastapi_app.state.embedding_model_processor = embedding_model_processor
+    fastapi_app.state.embedder = embedder
 
     fastapi_app.state.component_factory = BackendComponentFactory(
         config=config,
-        embedding_model=embedding_model,
-        embedding_processor=embedding_model_processor,
-        device=device,
+        embedder=embedder,
     )
 
     fastapi_app.state.searcher_instance = (
@@ -123,10 +100,10 @@ async def lifespan(fastapi_app: FastAPI):
     yield
 
     logger.info("Server shutting down: clearing model resources")
+    fastapi_app.state.embedder.offload()
     del fastapi_app.state.searcher_instance
     del fastapi_app.state.component_factory
-    del fastapi_app.state.embedding_model_processor
-    del fastapi_app.state.embedding_model
+    del fastapi_app.state.embedder
     del fastapi_app.state.app_config
     gc.collect()
 
