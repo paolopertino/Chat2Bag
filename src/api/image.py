@@ -12,8 +12,11 @@ _SETTINGS = get_settings()
 
 _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
 
+# Frames live at <artifact_dir>/thumbnails/<camera_slug>/frame_<ts>.jpg (per-camera,
+# schema v3) or the legacy flat <artifact_dir>/thumbnails/frame_<ts>.jpg layout. The
+# optional single camera segment ([^/]+/) permits exactly one sub-level — no traversal.
 _FRAME_PATTERN = re.compile(
-    r"^.*/" + re.escape(_ARTIFACT_DIR_NAME) + r"/thumbnails/frame_\d+\.jpg$"
+    r"^.*/" + re.escape(_ARTIFACT_DIR_NAME) + r"/thumbnails/(?:[^/]+/)?frame_\d+\.jpg$"
 )
 
 
@@ -27,17 +30,12 @@ async def get_image(
     if not image_path.is_absolute():
         raise HTTPException(status_code=400, detail="Path must be absolute")
 
+    # The anchored pattern (matched after .resolve() collapses any `..`) is the
+    # traversal guard: it requires the file to sit directly under an
+    # <artifact_dir>/thumbnails[/<camera>] directory with a frame_<ts>.jpg name.
     if not _FRAME_PATTERN.match(image_path_str):
         raise HTTPException(
             status_code=400, detail="Path is not a valid extracted frame"
-        )
-
-    if (
-        image_path.parent.name != "thumbnails"
-        or image_path.parent.parent.name != _ARTIFACT_DIR_NAME
-    ):
-        raise HTTPException(
-            status_code=400, detail="Path is not inside the extracted frame directory"
         )
 
     if not image_path.exists() or not image_path.is_file():
