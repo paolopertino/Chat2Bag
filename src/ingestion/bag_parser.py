@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import re
 
 from pathlib import Path
 
@@ -15,6 +16,27 @@ from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
 
 logger = logging.getLogger(__name__)
+
+
+def camera_slug(topic: str) -> str:
+    """Filesystem-safe, stable slug for a ROS topic (used as a thumbnail subdir).
+
+    Collisions are theoretically possible for topics differing only in punctuation;
+    acceptable for ROS topic naming.
+    """
+    return re.sub(r"[^A-Za-z0-9]+", "_", topic).strip("_")
+
+
+def resize_long_side(cv_img, long_side: int):
+    """Aspect-preserving downscale so the longer edge == long_side. Never upscales."""
+    height, width = cv_img.shape[:2]
+    longest = max(height, width)
+    if longest <= long_side:
+        return cv_img
+    scale = long_side / float(longest)
+    new_w = max(1, int(round(width * scale)))
+    new_h = max(1, int(round(height * scale)))
+    return cv2.resize(cv_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 
 class BagParser:
