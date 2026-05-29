@@ -78,3 +78,19 @@ def test_siglip2_embedder_real_forward():
     assert img_vecs.shape[1] == emb.embedding_dim
     assert txt_vecs.shape[1] == emb.embedding_dim
     assert np.allclose(np.linalg.norm(img_vecs, axis=1), 1.0, atol=1e-4)
+
+
+@pytest.mark.skipif(os.environ.get("RUN_MODEL_TESTS") != "1", reason="requires TIPSv2 weights")
+def test_tipsv2_embedder_real_forward():
+    cfg = SimpleNamespace(
+        embedding=SimpleNamespace(backend="tipsv2", model="google/tipsv2-l14"),
+        models=SimpleNamespace(model_storage="models"),
+    )
+    emb = create_embedder(cfg)
+    assert emb.name == "tipsv2:google/tipsv2-l14"
+    assert emb.embedding_dim == 1024
+    img_vecs = emb.embed_images([Image.new("RGB", (640, 420))])
+    txt_vecs = emb.embed_text(["a pedestrian on a crosswalk"])
+    assert img_vecs.shape == (1, 1024)
+    assert txt_vecs.shape[1] == 1024
+    assert np.allclose(np.linalg.norm(img_vecs, axis=1), 1.0, atol=1e-4)
