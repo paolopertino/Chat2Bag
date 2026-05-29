@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import torch
 from PIL import Image
@@ -20,7 +18,6 @@ class TipsV2Embedder(FrameEmbedder):
 
     def __init__(self, config):
         self._model_id = config.embedding.model
-        self._storage = config.models.model_storage
         self._device = "cpu"
 
         self._model = self._load()
@@ -30,13 +27,11 @@ class TipsV2Embedder(FrameEmbedder):
             self._dim = int(self.embed_images([Image.new("RGB", (28, 28))]).shape[1])
 
     def _load(self):
-        local = os.path.join(self._storage, self._model_id)
-        try:
-            return AutoModel.from_pretrained(local, trust_remote_code=True)
-        except (OSError, ValueError):
-            model = AutoModel.from_pretrained(self._model_id, trust_remote_code=True)
-            model.save_pretrained(local)
-            return model
+        # Load straight from the HF hub cache (~/.cache/huggingface), which persists
+        # the download outside the repo. Do NOT save_pretrained into model_storage:
+        # TIPSv2 ships trust_remote_code modeling *.py files, and writing them into the
+        # project tree makes `uvicorn --reload` watch them and reload-loop forever.
+        return AutoModel.from_pretrained(self._model_id, trust_remote_code=True)
 
     @property
     def name(self) -> str:
