@@ -10,8 +10,8 @@ storage:
   storage_path: null                                                                        # Optional path to store the artifact directory. If null, it defaults to the indexed bag directory.
 
 embedding:
-  backend: "siglip2"                                                                        # Registry key: siglip2 | tipsv2
-  model: "google/siglip2-base-patch16-naflex"                                               # HF id or local checkpoint path for the active backend.
+  backend: "tipsv2"                                                                         # Registry key: siglip2 | tipsv2
+  model: "google/tipsv2-l14"                                                                # HF id or local checkpoint path for the active backend.
 
 models:
   orchestration_llm: "gemma-2-9b"
