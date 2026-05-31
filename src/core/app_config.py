@@ -31,6 +31,7 @@ class ModelsConfig:
 class EmbeddingConfig:
     backend: str
     model: str
+    encode_long_side: int
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def get_app_config() -> AppConfig:
         embedding=EmbeddingConfig(
             backend=str(settings["embedding"]["backend"]),
             model=str(settings["embedding"]["model"]),
+            encode_long_side=int(settings["embedding"].get("encode_long_side", 896)),
         ),
         search=SearchConfig(
             temporal_dedup_window_sec=float(

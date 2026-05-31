@@ -32,6 +32,17 @@ def test_embedding_block_parsed(monkeypatch):
         app_config_mod.get_app_config.cache_clear()
 
 
+def test_embedding_encode_long_side_defaults_to_896(monkeypatch):
+    # _FAKE_SETTINGS has no encode_long_side → exercises the .get default.
+    monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
+    app_config_mod.get_app_config.cache_clear()
+    try:
+        cfg = app_config_mod.get_app_config()
+        assert cfg.embedding.encode_long_side == 896
+    finally:
+        app_config_mod.get_app_config.cache_clear()
+
+
 def test_ingestion_long_side_and_camera_topics_parsed(monkeypatch):
     monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
     app_config_mod.get_app_config.cache_clear()
