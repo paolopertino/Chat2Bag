@@ -1419,13 +1419,20 @@ export function SearchPage() {
   };
 
   const setMode = (next: SearchMode) => {
+    // Single atomic URL write: setting mode and clearing the global query in two
+    // separate setSearchParams calls would race (each recomputes from its own stale
+    // snapshot, last write wins) and clobber ?mode=region. So do it in one params object.
     const params = new URLSearchParams(searchParams);
-    if (next === "region") params.set("mode", "region");
-    else params.delete("mode");
+    if (next === "region") {
+      params.set("mode", "region");
+      params.delete("q");
+      params.delete("similar");
+    } else {
+      params.delete("mode");
+    }
     setSearchParams(params, { replace: false });
     if (next === "region") {
       setGlobalDraft("");
-      search.clear();
     } else {
       region.clear();
       setRegionDraft("");
