@@ -1,6 +1,8 @@
+import dataclasses
 import json
 
 import numpy as np
+from PIL import Image
 
 from src.core.app_config import get_app_config
 from src.region.faiss_index import FaissPatchIndex
@@ -91,3 +93,34 @@ def test_skips_bag_without_region_index(tmp_path):
     cfg = get_app_config()
     searcher = RegionSearcher(config=cfg, embedder=FakeDenseEmbedder(dim=8))
     assert searcher.search_by_q(_unit(8, 0), [str(bag)], top_k=5) == []
+
+
+def test_refine_recomputes_top_frame(tmp_path):
+    dim = 4
+    bag = tmp_path / "bagR"
+    bag.mkdir()
+    artifact = bag / ".bag_chat"
+    (artifact / "thumbnails" / "cam_a").mkdir(parents=True)
+    Image.new("RGB", (60, 40)).save(artifact / "thumbnails/cam_a/frame_10.jpg")
+    f0 = np.stack([_unit(dim, 0)])
+    frames = [{"timestamp_ns": 10, "topic": "/cam/a", "file_path": "thumbnails/cam_a/frame_10.jpg"}]
+    bag_path = _make_region_bag(bag, frames, [f0], dim)
+
+    base = get_app_config()
+    # Fresh config with refine on — do NOT mutate the lru-cached AppConfig in place.
+    cfg = dataclasses.replace(
+        base, region_search=dataclasses.replace(base.region_search, refine_enabled=True)
+    )
+    searcher = RegionSearcher(config=cfg, embedder=FakeDenseEmbedder(dim=dim))
+
+    calls = {"n": 0}
+    orig = searcher._embedder.embed_dense
+
+    def _spy(imgs):
+        calls["n"] += 1
+        return orig(imgs)
+
+    searcher._embedder.embed_dense = _spy
+    results = searcher.search_by_q(_unit(dim, 0), [bag_path], top_k=5)
+    assert calls["n"] >= 1  # refine recomputed the top frame from its thumbnail
+    assert results[0]["timestamp_ns"] == 10

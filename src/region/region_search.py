@@ -127,7 +127,26 @@ class RegionSearcher:
                 )
 
         all_results.sort(key=lambda x: x["similarity_score"], reverse=True)
+        if self._cfg.refine_enabled and all_results:
+            head = self._refine(q, all_results[: self._cfg.refine_top_n])
+            all_results = head + all_results[self._cfg.refine_top_n :]
+            all_results.sort(key=lambda x: x["similarity_score"], reverse=True)
         return self._apply_temporal_dedup(all_results)[:top_k]
+
+    def _refine(self, q: np.ndarray, results: list[dict]) -> list[dict]:
+        """Recompute exact MaxSim for each result from its thumbnail (compute, not storage)."""
+        from PIL import Image
+
+        q = q.reshape(-1)
+        for res in results:
+            try:
+                with Image.open(res["file_path"]) as im:
+                    grid = self._embedder.embed_dense([im.convert("RGB")])[0]
+            except (FileNotFoundError, OSError):
+                continue
+            sims = grid.reshape(-1, grid.shape[-1]) @ q
+            res["similarity_score"] = float(np.max(sims))
+        return results
 
     def search_by_points(self, image, points, bag_paths, top_k=5, exclude_file_path=None):
         q = build_query_from_points(image, points, self._embedder)
