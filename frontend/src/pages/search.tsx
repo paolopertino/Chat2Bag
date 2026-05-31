@@ -1,5 +1,5 @@
 import { Crosshair, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -52,6 +52,21 @@ export function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, search.q, search.similar]);
 
+  // One-shot handoff from the Bag Explorer: /search?mode=region&support=<frame path>
+  // seeds the point-canvas dialog with that frame, then strips the param.
+  const seededSupportRef = useRef<string | null>(null);
+  useEffect(() => {
+    const support = searchParams.get("support");
+    if (!support || seededSupportRef.current === support) return;
+    seededSupportRef.current = support;
+    setEditingSupport({ kind: "frame", filePath: support });
+    setDialogInitialPoints([]);
+    setDialogOpen(true);
+    const params = new URLSearchParams(searchParams);
+    params.delete("support");
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const getResultHref = (result: SearchResult) =>
     `/bags/${encodeBagId(result.bag_path)}?t=${result.timestamp_ns}`;
 
@@ -100,7 +115,11 @@ export function SearchPage() {
     setDialogOpen(true);
   };
 
-  const handlePromote = (result: SearchResult) => {
+  // Promote a frame (from a global or region result, or the lightbox) into a
+  // region-by-frame query: switch to Region mode if needed, then open the
+  // point-canvas dialog seeded with that frame.
+  const handleUseForRegion = (result: SearchResult) => {
+    if (mode !== "region") setMode("region");
     setLightboxIndex(null);
     setEditingSupport({ kind: "frame", filePath: result.file_path });
     setDialogInitialPoints([]);
@@ -230,6 +249,7 @@ export function SearchPage() {
             isSearching={false}
             getResultHref={getResultHref}
             onSimilarSearch={handleSimilar}
+            onUseAsRegionSupport={handleUseForRegion}
           />
         )
       ) : region.unavailable ? (
@@ -252,7 +272,7 @@ export function SearchPage() {
           results={regionResults}
           isSearching={false}
           onResultClick={openLightbox}
-          onUseAsRegionSupport={handlePromote}
+          onUseAsRegionSupport={handleUseForRegion}
         />
       )}
 
@@ -272,7 +292,7 @@ export function SearchPage() {
           onClose={() => setLightboxIndex(null)}
           fetchHeatmap={region.fetchHeatmap}
           getResultHref={getResultHref}
-          onUseAsRegionSupport={handlePromote}
+          onUseAsRegionSupport={handleUseForRegion}
         />
       ) : null}
     </div>
