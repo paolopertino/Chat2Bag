@@ -203,3 +203,37 @@ def test_tipsv2_embedder_real_forward():
     assert img_vecs.shape == (1, 1024)
     assert txt_vecs.shape[1] == 1024
     assert np.allclose(np.linalg.norm(img_vecs, axis=1), 1.0, atol=1e-4)
+
+
+@pytest.mark.skipif(os.environ.get("RUN_MODEL_TESTS") != "1", reason="requires TIPSv2 weights")
+def test_tipsv2_dense_capability_and_grid_contract():
+    from src.core.app_config import get_app_config
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    emb = create_embedder(get_app_config(), device=device)
+    assert "dense" in emb.capabilities
+    assert emb.encode_long_side == 896
+
+    grids = emb.embed_dense([Image.new("RGB", (840, 560))])
+    assert len(grids) == 1
+    grid = grids[0]
+    assert grid.ndim == 3 and grid.shape[2] == emb.embedding_dim
+    h_p, w_p, _ = grid.shape
+    # Aspect-preserving long-side 840 (<= 896) → /14 geometry.
+    assert w_p == 840 // 14 and h_p == 560 // 14
+    norms = np.linalg.norm(grid.reshape(-1, grid.shape[2]), axis=1)
+    assert np.allclose(norms, 1.0, atol=1e-4)
+
+
+@pytest.mark.skipif(os.environ.get("RUN_MODEL_TESTS") != "1", reason="requires TIPSv2 weights")
+def test_tipsv2_fused_cls_matches_embed_images_and_removes_hook():
+    from src.core.app_config import get_app_config
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    emb = create_embedder(get_app_config(), device=device)
+    img = Image.new("RGB", (840, 560))
+
+    (cls_fused, grid), = emb.embed_global_and_dense([img])
+    cls_standalone = emb.embed_images([img])[0]
+    assert np.allclose(cls_fused, cls_standalone, atol=1e-4)
+    assert grid.shape[2] == emb.embedding_dim
+    # Hook must not leak onto the encoder after the call.
+    assert len(emb._model.vision_encoder.blocks[-1]._forward_pre_hooks) == 0

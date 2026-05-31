@@ -49,6 +49,7 @@ class TipsV2Embedder(FrameEmbedder):
 
     def __init__(self, config, device: str = "cpu"):
         self._model_id = config.embedding.model
+        self._encode_long_side = int(getattr(config.embedding, "encode_long_side", _ENCODE_LONG_SIDE))
         self._device = device
         self._image_dtype = _image_dtype_for_device(device)
 
@@ -83,13 +84,17 @@ class TipsV2Embedder(FrameEmbedder):
         return self._dim
 
     @property
+    def encode_long_side(self) -> int | None:
+        return self._encode_long_side
+
+    @property
     def capabilities(self) -> frozenset[str]:
-        return frozenset({"global", "text"})
+        return frozenset({"global", "text", "dense"})
 
     def _preprocess(self, image: Image.Image) -> torch.Tensor:
         """Aspect-preserving ÷14 resize + ToTensor (0..1). Mirrors the reference notebook."""
         width, height = image.size
-        long_side = min(_ENCODE_LONG_SIDE, max(width, height))  # don't upscale
+        long_side = min(self._encode_long_side, max(width, height))  # don't upscale
         if width >= height:
             new_w = long_side
             new_h = int(height * long_side / width)
@@ -124,6 +129,77 @@ class TipsV2Embedder(FrameEmbedder):
             feats = self._model.encode_text(list(queries))
             feats = feats / feats.norm(dim=-1, keepdim=True)
         return feats.float().cpu().numpy().astype(np.float32)
+
+    def _value_attention_from_block_input(self, x: torch.Tensor) -> torch.Tensor:
+        """Run ONLY the last block's value-path on its captured input tensor `x`,
+        then final LayerNorm; strip CLS + register tokens. Returns (n_patches, dim).
+        Ported from features_inspection.ipynb cell 6 (encode_image_value_attention)."""
+        ve = self._model.vision_encoder
+        blk = ve.blocks[-1]
+        xn = blk.norm1(x)
+        b, n, c = xn.shape
+        qkv = (
+            blk.attn.qkv(xn)
+            .reshape(b, n, 3, blk.attn.num_heads, c // blk.attn.num_heads)
+            .permute(2, 0, 3, 1, 4)
+        )
+        v = qkv[2]
+        v_out = blk.attn.proj(v.transpose(1, 2).reshape(b, n, c))
+        x_val = blk.ls1(v_out) + x
+        x_val = x_val + blk.ls2(blk.mlp(blk.norm2(x_val)))
+        x_val = ve.norm(x_val)
+        patches = x_val[:, 1 + ve.num_register_tokens:, :]  # (b, n_patches, dim)
+        return patches[0]
+
+    def _encode_cls_and_value(self, pixel_values: torch.Tensor):
+        """One trunk pass: capture last-block input via a pre-hook, get CLS from the
+        model's public encode_image, then run the value head on the capture."""
+        ve = self._model.vision_encoder
+        captured = {}
+
+        def _pre_hook(module, args):
+            captured["x"] = args[0]
+
+        handle = ve.blocks[-1].register_forward_pre_hook(_pre_hook)
+        try:
+            cls = self._model.encode_image(pixel_values).cls_token.reshape(-1)
+        finally:
+            handle.remove()
+
+        x = captured["x"]
+        patches_flat = self._value_attention_from_block_input(x)  # (n_patches, dim)
+
+        _, _, h_i, w_i = pixel_values.shape
+        h_p, w_p = h_i // _PATCH, w_i // _PATCH
+        n_patches = patches_flat.shape[0]
+        assert n_patches == h_p * w_p, (
+            f"patch-count mismatch: {n_patches} != {h_p}*{w_p}; model token layout changed"
+        )
+        grid = patches_flat.reshape(h_p, w_p, -1)
+        return cls, grid
+
+    @torch.no_grad()
+    def embed_global_and_dense(self, images):
+        out = []
+        for image in images:
+            pixel_values = self._preprocess(image.convert("RGB")).unsqueeze(0).to(
+                device=self._device, dtype=self._image_dtype
+            )
+            cls, grid = self._encode_cls_and_value(pixel_values)
+            cls = cls / cls.norm()          # model dtype: keeps fused CLS == embed_images CLS
+            grid = grid.float()             # upcast before norm so patches are unit-norm in fp32
+            grid = grid / grid.norm(dim=-1, keepdim=True)
+            out.append(
+                (
+                    cls.float().cpu().numpy().astype(np.float32),
+                    grid.cpu().numpy().astype(np.float32),
+                )
+            )
+        return out
+
+    @torch.no_grad()
+    def embed_dense(self, images):
+        return [grid for _, grid in self.embed_global_and_dense(images)]
 
     def to(self, device: str) -> "TipsV2Embedder":
         self._device = device
