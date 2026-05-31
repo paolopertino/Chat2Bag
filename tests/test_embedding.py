@@ -73,6 +73,17 @@ def test_embed_dense_is_unimplemented_seam():
         emb.embed_dense([Image.new("RGB", (8, 8))])
 
 
+def test_embed_global_and_dense_is_unimplemented_seam():
+    emb = create_embedder(_cfg("fake-test-backend"))
+    with pytest.raises(NotImplementedError):
+        emb.embed_global_and_dense([Image.new("RGB", (8, 8))])
+
+
+def test_encode_long_side_default_is_none():
+    emb = create_embedder(_cfg("fake-test-backend"))
+    assert emb.encode_long_side is None
+
+
 def test_outputs_are_l2_normalized():
     emb = create_embedder(_cfg("fake-test-backend"))
     vecs = emb.embed_images([Image.new("RGB", (8, 8)), Image.new("RGB", (8, 8))])

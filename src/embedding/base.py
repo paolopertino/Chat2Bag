@@ -26,7 +26,7 @@ class FrameEmbedder(ABC):
     @property
     @abstractmethod
     def capabilities(self) -> frozenset[str]:
-        """Subset of {'global', 'text', 'dense'}. This effort ships {'global', 'text'}."""
+        """Subset of {'global', 'text', 'dense'}. 'dense' enables Region search."""
 
     @abstractmethod
     def embed_images(self, images: list[Image.Image]) -> np.ndarray:
@@ -36,9 +36,23 @@ class FrameEmbedder(ABC):
     def embed_text(self, queries: list[str]) -> np.ndarray:
         """(N, dim) float32, L2-normalized. Raw query text in; no caller-side templating."""
 
-    def embed_dense(self, images: list[Image.Image]) -> np.ndarray:
-        """Documented seam for Region search; unimplemented until Region search is specced."""
+    @property
+    def encode_long_side(self) -> int | None:
+        """Dense encode geometry (long edge, ÷patch). None if the backend has no
+        manual encode resolution. Region search reads this to stamp/validate."""
+        return None
+
+    def embed_dense(self, images: list[Image.Image]) -> list[np.ndarray]:
+        """Region-search seam. One (H_p, W_p, dim) float32 array per image,
+        L2-normalized per Patch. Grids vary per image (aspect-preserving ÷patch)."""
         raise NotImplementedError(f"{self.name} does not implement dense/region embeddings")
+
+    def embed_global_and_dense(
+        self, images: list[Image.Image]
+    ) -> list[tuple[np.ndarray, np.ndarray]]:
+        """One trunk pass per image → (cls (dim,), grid (H_p, W_p, dim)), both
+        L2-normalized. Used by the fused fresh-index loop."""
+        raise NotImplementedError(f"{self.name} does not implement fused dense embeddings")
 
     @abstractmethod
     def to(self, device: str) -> "FrameEmbedder":
