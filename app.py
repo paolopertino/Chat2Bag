@@ -92,6 +92,10 @@ async def lifespan(fastapi_app: FastAPI):
         fastapi_app.state.component_factory.create_global_searcher()
     )
 
+    fastapi_app.state.region_searcher_instance = (
+        fastapi_app.state.component_factory.create_region_searcher()
+    )
+
     if config.extraction.enabled:
         logger.info("Dataset extraction enabled, service URL: %s", config.extraction.service_url)
     else:
@@ -102,6 +106,8 @@ async def lifespan(fastapi_app: FastAPI):
     logger.info("Server shutting down: clearing model resources")
     fastapi_app.state.embedder.offload()
     del fastapi_app.state.searcher_instance
+    if getattr(fastapi_app.state, "region_searcher_instance", None) is not None:
+        del fastapi_app.state.region_searcher_instance
     del fastapi_app.state.component_factory
     del fastapi_app.state.embedder
     del fastapi_app.state.app_config
