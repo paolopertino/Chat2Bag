@@ -51,6 +51,12 @@ class RegionHeatmapTextRequest(BaseModel):
     target_file_path: str = Field(..., min_length=1)
 
 
+class RegionHeatmapByFrameRequest(BaseModel):
+    support_file_path: str = Field(..., min_length=1)
+    points: List[Point] = Field(..., min_length=1)
+    target_file_path: str = Field(..., min_length=1)
+
+
 @router.post("/search")
 async def search_bags(
     req: SearchRequest,
@@ -183,6 +189,50 @@ async def region_heatmap(
         grid = service.heatmap_by_text(text=req.text, target_file_path=req.target_file_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    return grid
+
+
+@router.post("/search/region/heatmap/by-frame")
+async def region_heatmap_by_frame(
+    req: RegionHeatmapByFrameRequest,
+    service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+):
+    """Recomputed value-attention cosine grid for a target frame vs points on a Support Frame."""
+    try:
+        grid = service.heatmap_by_frame(
+            support_file_path=req.support_file_path,
+            points=[p.model_dump() for p in req.points],
+            target_file_path=req.target_file_path,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    return grid
+
+
+@router.post("/search/region/heatmap/by-image")
+async def region_heatmap_by_image(
+    service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+    image: UploadFile = File(...),
+    points: str = Form(...),
+    target_file_path: str = Form(...),
+):
+    """Recomputed cosine grid for a target frame vs points on an uploaded Support image."""
+    import json as _json
+
+    try:
+        parsed_points = _json.loads(points)
+        image_bytes = await image.read()
+        grid = service.heatmap_by_image(
+            image_bytes=image_bytes, points=parsed_points, target_file_path=target_file_path,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:

@@ -1,4 +1,5 @@
 import io as _io
+import json
 
 import pytest
 from fastapi import FastAPI
@@ -31,6 +32,12 @@ class _SvcStub:
     def heatmap_by_text(self, text, target_file_path):
         return {"height": 2, "width": 3, "grid": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}
 
+    def heatmap_by_frame(self, support_file_path, points, target_file_path):
+        return {"height": 2, "width": 3, "grid": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}
+
+    def heatmap_by_image(self, image_bytes, points, target_file_path):
+        return {"height": 2, "width": 3, "grid": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}
+
 
 def test_region_by_text_endpoint(bypass_auth):
     client = _client_with_stub(bypass_auth, _SvcStub())
@@ -57,6 +64,30 @@ def test_region_heatmap_endpoint(bypass_auth):
     assert resp.status_code == 200
     body = resp.json()
     assert body["height"] == 2 and body["width"] == 3
+
+
+def test_region_heatmap_by_frame_endpoint(bypass_auth):
+    client = _client_with_stub(bypass_auth, _SvcStub())
+    resp = client.post("/api/search/region/heatmap/by-frame", json={
+        "support_file_path": "/b/.bag_chat/thumbnails/cam_a/frame_1.jpg",
+        "points": [{"x": 0.5, "y": 0.5}],
+        "target_file_path": "/b/.bag_chat/thumbnails/cam_a/frame_9.jpg",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["height"] == 2 and body["width"] == 3
+
+
+def test_region_heatmap_by_image_endpoint(bypass_auth):
+    client = _client_with_stub(bypass_auth, _SvcStub())
+    resp = client.post(
+        "/api/search/region/heatmap/by-image",
+        data={"points": json.dumps([{"x": 0.5, "y": 0.5}]),
+              "target_file_path": "/b/.bag_chat/thumbnails/cam_a/frame_9.jpg"},
+        files={"image": ("s.png", b"fake-image-bytes", "image/png")},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["width"] == 3
 
 
 class _StubSearcher:
