@@ -8,6 +8,8 @@ import type {
   ExtractionSubmitRequest,
   ExtractionSubmitResponse,
   FramesResponse,
+  HeatmapResponse,
+  Point,
   ScanBagsResponse,
   SearchResponse,
 } from "./types";
@@ -286,4 +288,91 @@ export async function getExtractionLogs(jobId: string, tail = 500): Promise<stri
     `/api/datasets/jobs/${encodeURIComponent(jobId)}/logs?tail=${tail}`,
   );
   return resp.lines;
+}
+
+// ---- Region search ----
+
+export async function regionSearchByText(
+  text: string,
+  bagPaths: string[],
+  topK: number,
+): Promise<SearchResponse> {
+  return http<SearchResponse>("/api/search/region/by-text", {
+    method: "POST",
+    body: JSON.stringify({ text, bag_paths: bagPaths, top_k: topK }),
+  });
+}
+
+export async function regionSearchByFrame(
+  supportFilePath: string,
+  points: Point[],
+  bagPaths: string[],
+  topK: number,
+): Promise<SearchResponse> {
+  return http<SearchResponse>("/api/search/region/by-frame", {
+    method: "POST",
+    body: JSON.stringify({
+      support_file_path: supportFilePath,
+      points,
+      bag_paths: bagPaths,
+      top_k: topK,
+    }),
+  });
+}
+
+export async function regionSearchByImage(
+  file: File,
+  points: Point[],
+  bagPaths: string[],
+  topK: number,
+): Promise<SearchResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("points", JSON.stringify(points));
+  formData.append("top_k", String(topK));
+  for (const bagPath of bagPaths) formData.append("bag_paths", bagPath);
+  return http<SearchResponse>("/api/search/region/by-image", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function regionHeatmapByText(
+  text: string,
+  targetFilePath: string,
+): Promise<HeatmapResponse> {
+  return http<HeatmapResponse>("/api/search/region/heatmap", {
+    method: "POST",
+    body: JSON.stringify({ text, target_file_path: targetFilePath }),
+  });
+}
+
+export async function regionHeatmapByFrame(
+  supportFilePath: string,
+  points: Point[],
+  targetFilePath: string,
+): Promise<HeatmapResponse> {
+  return http<HeatmapResponse>("/api/search/region/heatmap/by-frame", {
+    method: "POST",
+    body: JSON.stringify({
+      support_file_path: supportFilePath,
+      points,
+      target_file_path: targetFilePath,
+    }),
+  });
+}
+
+export async function regionHeatmapByImage(
+  file: File,
+  points: Point[],
+  targetFilePath: string,
+): Promise<HeatmapResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("points", JSON.stringify(points));
+  formData.append("target_file_path", targetFilePath);
+  return http<HeatmapResponse>("/api/search/region/heatmap/by-image", {
+    method: "POST",
+    body: formData,
+  });
 }

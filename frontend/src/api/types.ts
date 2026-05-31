@@ -40,6 +40,17 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface HeatmapResponse {
+  height: number;
+  width: number;
+  grid: number[][];
+}
+
 export interface FrameInfo {
   timestamp_ns: number;
   file_path: string;
