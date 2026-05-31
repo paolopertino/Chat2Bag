@@ -55,12 +55,21 @@ function getNearestFrameTimestamp(frames: FrameInfo[], targetNs: number): number
     return null;
   }
 
-  const firstAtOrAfter = frames.find((frame) => frame.timestamp_ns >= targetNs);
-  if (firstAtOrAfter) {
-    return firstAtOrAfter.timestamp_ns;
+  // Nearest by absolute distance, NOT first-at-or-after. Nanosecond epoch
+  // timestamps exceed JS's 2^53 safe-integer range, so they round to ~256ns
+  // when they pass through JSON/Number(); "first >= target" would then jump to
+  // the next frame whenever the target rounded up. Frame spacing (~1s) dwarfs
+  // the rounding error, so nearest-by-distance always snaps to the right frame.
+  let best = frames[0].timestamp_ns;
+  let bestDiff = Math.abs(best - targetNs);
+  for (const frame of frames) {
+    const diff = Math.abs(frame.timestamp_ns - targetNs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = frame.timestamp_ns;
+    }
   }
-
-  return frames[frames.length - 1].timestamp_ns;
+  return best;
 }
 
 export function useSequenceViewer() {
@@ -248,10 +257,15 @@ export function useSequenceViewer() {
       const requestId = viewerLoadRequestIdRef.current + 1;
       viewerLoadRequestIdRef.current = requestId;
 
+      // Center the window on the requested frame so ±256ns timestamp rounding
+      // (JS number precision on ns epochs) can't push it outside the fetched
+      // window's inclusive [start, end] bounds and land selection on a neighbor.
+      const windowStartNs = Math.max(0, Math.floor(startNs - (durationSec * 1_000_000_000) / 2));
+
       resetViewerState(synthetic, startNs);
       await loadViewerFrames({
         bagPath,
-        requestStartNs: startNs,
+        requestStartNs: windowStartNs,
         durationSec,
         preferredSelectedNs: startNs,
         requestId,
