@@ -36,3 +36,10 @@ class RegionSearchService:
         return self._searcher.search_by_points(
             image=image, points=points, bag_paths=bag_paths, top_k=top_k,
         )
+
+    def heatmap_by_text(self, text: str, target_file_path: str) -> dict:
+        if not text.strip():
+            raise ValueError("Text query must not be empty.")
+        if not target_file_path.strip():
+            raise ValueError("target_file_path must not be empty.")
+        return self._searcher.heatmap_for_text(text=text, target_file_path=target_file_path)

@@ -46,6 +46,11 @@ class RegionByTextRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=100)
 
 
+class RegionHeatmapTextRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    target_file_path: str = Field(..., min_length=1)
+
+
 @router.post("/search")
 async def search_bags(
     req: SearchRequest,
@@ -166,3 +171,20 @@ async def region_search_by_image(
     except OSError as exc:
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
     return {"query": "region:image", "results": results}
+
+
+@router.post("/search/region/heatmap")
+async def region_heatmap(
+    req: RegionHeatmapTextRequest,
+    service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+):
+    """Recomputed value-attention cosine grid for a target frame vs a text query."""
+    try:
+        grid = service.heatmap_by_text(text=req.text, target_file_path=req.target_file_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    return grid

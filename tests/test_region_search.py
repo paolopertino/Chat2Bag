@@ -124,3 +124,18 @@ def test_refine_recomputes_top_frame(tmp_path):
     results = searcher.search_by_q(_unit(dim, 0), [bag_path], top_k=5)
     assert calls["n"] >= 1  # refine recomputed the top frame from its thumbnail
     assert results[0]["timestamp_ns"] == 10
+
+
+def test_heatmap_returns_grid_and_dims(tmp_path):
+    dim = 4
+    bag = tmp_path / "bagH"
+    artifact = bag / ".bag_chat"
+    (artifact / "thumbnails" / "cam_a").mkdir(parents=True)
+    Image.new("RGB", (60, 40)).save(artifact / "thumbnails/cam_a/frame_10.jpg")
+    target = str(artifact / "thumbnails/cam_a/frame_10.jpg")
+
+    cfg = get_app_config()
+    searcher = RegionSearcher(config=cfg, embedder=FakeDenseEmbedder(dim=dim))
+    out = searcher.heatmap(_unit(dim, 0), target)
+    assert out["height"] == 2 and out["width"] == 3  # FakeDenseEmbedder grid is (2,3,dim)
+    assert len(out["grid"]) == 2 and len(out["grid"][0]) == 3

@@ -25,6 +25,9 @@ class _SvcStub:
     def search_by_image(self, image_bytes, points, bag_paths, top_k):
         return [{"timestamp_ns": 3, "topic": "/cam/a", "similarity_score": 0.7}]
 
+    def heatmap_by_text(self, text, target_file_path):
+        return {"height": 2, "width": 3, "grid": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}
+
 
 def test_region_by_text_endpoint(bypass_auth):
     client = _client_with_stub(bypass_auth, _SvcStub())
@@ -41,6 +44,16 @@ def test_region_by_frame_endpoint(bypass_auth):
     })
     assert resp.status_code == 200
     assert resp.json()["results"][0]["timestamp_ns"] == 2
+
+
+def test_region_heatmap_endpoint(bypass_auth):
+    client = _client_with_stub(bypass_auth, _SvcStub())
+    resp = client.post("/api/search/region/heatmap", json={
+        "text": "car", "target_file_path": "/b/.bag_chat/thumbnails/cam_a/frame_1.jpg",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["height"] == 2 and body["width"] == 3
 
 
 class _StubSearcher:

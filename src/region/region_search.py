@@ -155,3 +155,21 @@ class RegionSearcher:
     def search_by_text(self, text, bag_paths, top_k=5):
         q = build_query_from_text(text, self._embedder, self._cfg.text_templates)
         return self.search_by_q(q, bag_paths, top_k)
+
+    def heatmap(self, q: np.ndarray, target_file_path: str) -> dict:
+        """Recompute the target frame's value-attention patches and return the
+        (H_p, W_p) cosine grid vs q. Independent of any index."""
+        from PIL import Image
+
+        q = q.reshape(-1)
+        with Image.open(target_file_path) as im:
+            grid = self._embedder.embed_dense([im.convert("RGB")])[0]  # (H_p, W_p, dim)
+        h_p, w_p, _ = grid.shape
+        sims = (grid.reshape(-1, grid.shape[-1]) @ q).reshape(h_p, w_p)
+        return {"height": int(h_p), "width": int(w_p), "grid": sims.astype(float).tolist()}
+
+    def heatmap_for_text(self, text: str, target_file_path: str) -> dict:
+        return self.heatmap(build_query_from_text(text, self._embedder, self._cfg.text_templates), target_file_path)
+
+    def heatmap_for_points(self, image, points, target_file_path: str) -> dict:
+        return self.heatmap(build_query_from_points(image, points, self._embedder), target_file_path)
