@@ -10,7 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from src.core.app_config import AppConfig, get_app_config
-from src.core.index_stamp import write_embedder_stamp
+from src.core.index_stamp import write_embedder_stamp, write_region_stamp
 from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
 from src.embedding import FrameEmbedder, create_embedder
@@ -24,6 +24,7 @@ class Indexer:
         bag_path: str,
         config: AppConfig | None = None,
         embedder: FrameEmbedder | None = None,
+        region_indexer=None,
     ):
         self.bag_path = Path(bag_path)
         app_config = config or get_app_config()
@@ -41,6 +42,7 @@ class Indexer:
         # The embedder is normally injected (shared singleton). Fall back to building
         # one from config for standalone/CLI use.
         self.embedder = embedder if embedder is not None else create_embedder(app_config)
+        self._region_indexer = region_indexer
 
     def build_index(self):
         """Embeds frames via the active embedder, writes LanceDB, and stamps metadata."""
@@ -64,39 +66,66 @@ class Indexer:
         db = lancedb.connect(str(self.db_path))
         table_name = "frames"
         data_to_insert = []
+        region_active = self._region_indexer is not None and "dense" in self.embedder.capabilities
 
         logger.info(
-            "Generating embeddings for %s frames with %s...", len(frames), self.embedder.name
+            "Generating embeddings for %s frames with %s (region=%s)...",
+            len(frames), self.embedder.name, region_active,
         )
-        for i in tqdm(range(0, len(frames), self.batch_size)):
-            batch_meta = frames[i : i + self.batch_size]
-            valid_batch_meta = []
-            images = []
-            for meta in batch_meta:
+
+        if region_active:
+            # Fused fresh-index loop: one trunk pass per frame → CLS to LanceDB,
+            # value-attention grid to the region indexer.
+            for frame_id, meta in enumerate(tqdm(frames)):
                 abs_path = str(self.artifact_dir / meta["file_path"])
                 try:
                     with Image.open(abs_path) as image:
-                        images.append(image.convert("RGB"))
-                    valid_batch_meta.append({**meta, "_abs_path": abs_path})
+                        img = image.convert("RGB")
                 except (FileNotFoundError, OSError):
                     logger.warning(
                         "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
                     )
-
-            if not images:
-                continue
-
-            embeddings = self.embedder.embed_images(images)
-
-            for meta, emb in zip(valid_batch_meta, embeddings):
+                    continue
+                (cls, grid), = self.embedder.embed_global_and_dense([img])
                 data_to_insert.append(
                     {
                         "timestamp_ns": meta["timestamp_ns"],
-                        "file_path": meta["_abs_path"],
+                        "file_path": abs_path,
                         "topic": meta["topic"],
-                        "vector": emb.tolist(),
+                        "vector": cls.tolist(),
                     }
                 )
+                self._region_indexer.add_frame(frame_id, grid)
+        else:
+            for i in tqdm(range(0, len(frames), self.batch_size)):
+                batch_meta = frames[i : i + self.batch_size]
+                valid_batch_meta = []
+                images = []
+                for meta in batch_meta:
+                    abs_path = str(self.artifact_dir / meta["file_path"])
+                    try:
+                        with Image.open(abs_path) as image:
+                            images.append(image.convert("RGB"))
+                        valid_batch_meta.append({**meta, "_abs_path": abs_path})
+                    except (FileNotFoundError, OSError):
+                        logger.warning(
+                            "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
+                        )
+
+                if not images:
+                    continue
+
+                embeddings = self.embedder.embed_images(images)
+
+                for meta, emb in zip(valid_batch_meta, embeddings):
+                    data_to_insert.append(
+                        {
+                            "timestamp_ns": meta["timestamp_ns"],
+                            "file_path": meta["_abs_path"],
+                            "topic": meta["topic"],
+                            "vector": emb.tolist(),
+                        }
+                    )
 
         if not data_to_insert:
             logger.warning("No valid frames were embedded; skipping LanceDB write.")
@@ -111,6 +140,18 @@ class Indexer:
         write_embedder_stamp(
             self.metadata_path, name=self.embedder.name, dim=self.embedder.embedding_dim
         )
+
+        if region_active:
+            patch_count = self._region_indexer.finalize()
+            write_region_stamp(
+                self.metadata_path,
+                name=self.embedder.name,
+                dim=self.embedder.embedding_dim,
+                feature="value-attention",
+                encode_long_side=int(self.embedder.encode_long_side),
+                pq=self._region_indexer.pq_params,
+                patch_count=patch_count,
+            )
 
         logger.info(
             "Index built! %d records, stamped %s (dim=%d).",
