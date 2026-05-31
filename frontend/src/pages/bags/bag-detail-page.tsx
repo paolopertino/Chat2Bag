@@ -395,8 +395,11 @@ export function BagDetailPage() {
   );
 
   const hiddenPinCount = search.rawResultCount - search.results.length;
+  // Image search populates results without setting q/similar (it never touches the
+  // URL), so also show the rail when there are raw results — otherwise image-search
+  // pins stay hidden while text-search pins show.
   const pinRail =
-    search.q || search.similar ? (
+    search.q || search.similar || search.rawResultCount > 0 ? (
       <div className="space-y-2">
         <FilterChip
           topK={search.topK}
