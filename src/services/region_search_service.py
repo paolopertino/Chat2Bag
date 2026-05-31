@@ -43,3 +43,23 @@ class RegionSearchService:
         if not target_file_path.strip():
             raise ValueError("target_file_path must not be empty.")
         return self._searcher.heatmap_for_text(text=text, target_file_path=target_file_path)
+
+    def heatmap_by_frame(self, support_file_path: str, points: list[dict], target_file_path: str) -> dict:
+        if not support_file_path.strip():
+            raise ValueError("support_file_path must not be empty.")
+        if not target_file_path.strip():
+            raise ValueError("target_file_path must not be empty.")
+        image = Image.open(Path(support_file_path).expanduser().resolve()).convert("RGB")
+        return self._searcher.heatmap_for_points(
+            image=image, points=points, target_file_path=target_file_path,
+        )
+
+    def heatmap_by_image(self, image_bytes: bytes, points: list[dict], target_file_path: str) -> dict:
+        if not target_file_path.strip():
+            raise ValueError("target_file_path must not be empty.")
+        if not image_bytes:
+            raise ValueError("Image payload is empty.")
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        return self._searcher.heatmap_for_points(
+            image=image, points=points, target_file_path=target_file_path,
+        )

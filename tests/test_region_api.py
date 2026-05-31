@@ -1,6 +1,9 @@
+import io as _io
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from PIL import Image as PILImage
 
 from src.api.dependencies import get_region_search_service
 from src.api.search_routes import router as search_router
@@ -74,3 +77,38 @@ def test_service_delegates_text():
     svc = RegionSearchService(_StubSearcher())
     out = svc.search_by_text(text="car", bag_paths=["/b"], top_k=3)
     assert out[0]["text"] == "car" and out[0]["top_k"] == 3
+
+
+class _HeatStubSearcher:
+    def heatmap_for_points(self, image, points, target_file_path):
+        return {"height": 2, "width": 3, "grid": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+                "n_points": len(points), "target": target_file_path}
+
+
+def test_service_heatmap_by_frame_delegates(tmp_path):
+    support = tmp_path / "support.png"
+    PILImage.new("RGB", (8, 8), (123, 50, 200)).save(support)
+    svc = RegionSearchService(_HeatStubSearcher())
+    out = svc.heatmap_by_frame(
+        support_file_path=str(support), points=[{"x": 0.5, "y": 0.5}],
+        target_file_path="/b/t.jpg",
+    )
+    assert out["target"] == "/b/t.jpg"
+    assert out["n_points"] == 1
+
+
+def test_service_heatmap_by_image_delegates():
+    buf = _io.BytesIO()
+    PILImage.new("RGB", (8, 8), (10, 20, 30)).save(buf, format="PNG")
+    svc = RegionSearchService(_HeatStubSearcher())
+    out = svc.heatmap_by_image(
+        image_bytes=buf.getvalue(), points=[{"x": 0.1, "y": 0.2}],
+        target_file_path="/b/t.jpg",
+    )
+    assert out["n_points"] == 1
+
+
+def test_service_heatmap_rejects_empty_target():
+    svc = RegionSearchService(_HeatStubSearcher())
+    with pytest.raises(ValueError):
+        svc.heatmap_by_image(image_bytes=b"x", points=[], target_file_path="  ")
