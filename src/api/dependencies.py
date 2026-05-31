@@ -13,6 +13,7 @@ def get_indexing_service(request: Request) -> IndexingService:
         factory=request.app.state.component_factory,
         status_store=indexing_status,
         searcher=request.app.state.searcher_instance,
+        region_searcher=getattr(request.app.state, "region_searcher_instance", None),
     )
 
 
