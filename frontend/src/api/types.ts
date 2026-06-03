@@ -5,6 +5,7 @@ export interface BagInfo {
   bag_name: string;
   is_indexed: boolean;
   status: BagStatus;
+  error_message?: string | null;
 }
 
 export interface ScanBagsResponse {
@@ -15,6 +16,14 @@ export interface ScanBagsResponse {
 export interface BagStatusResponse {
   bag_path: string;
   status: BagStatus;
+  error_message?: string | null;
+}
+
+export interface BagInfoResponse {
+  bag_path: string;
+  frame_count: number;
+  first_timestamp_ns: number | null;
+  last_timestamp_ns: number | null;
 }
 
 export interface SearchResult {
@@ -29,6 +38,17 @@ export interface SearchResult {
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
+}
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface HeatmapResponse {
+  height: number;
+  width: number;
+  grid: number[][];
 }
 
 export interface FrameInfo {

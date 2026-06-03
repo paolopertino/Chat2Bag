@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Database, LoaderCircle, MessageSquareText, X } from "lucide-react";
 
-import { getImageUrl } from "../../api/client";
 import type { FrameInfo, SearchResult } from "../../api/types";
+import { AuthImage } from "../ui/auth-image";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -183,8 +183,8 @@ export function SequenceViewer({
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:gap-4 sm:p-5">
           <div className="shrink-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-white/80">
               {activeFrame ? (
-                <img
-                  src={getImageUrl(activeFrame.file_path)}
+                <AuthImage
+                  filePath={activeFrame.file_path}
                   alt={`Sequence frame from ${result.source_bag}`}
                   className="h-[clamp(230px,44vh,470px)] w-full bg-[var(--bg-sand)] object-cover"
                 />
@@ -290,8 +290,8 @@ export function SequenceViewer({
                             End
                           </span>
                         ) : null}
-                        <img
-                          src={getImageUrl(frame.file_path)}
+                        <AuthImage
+                          filePath={frame.file_path}
                           alt={`Frame at ${formatTimestampNs(frame.timestamp_ns)}`}
                           className="aspect-video w-full bg-[var(--bg-sand)] object-cover"
                         />

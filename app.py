@@ -9,9 +9,9 @@ import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from transformers import AutoProcessor, AutoModel
 
 from src.api import (
+    auth_router,
     bags_router,
     chat_router,
     datasets_router,
@@ -47,6 +47,16 @@ def _get_cors_origins() -> list[str]:
 async def lifespan(fastapi_app: FastAPI):
     setup_logging(str(LOGGING_CONFIG_PATH))
     logger.info("Server starting up")
+
+    # Fail fast if auth secrets are missing.
+    for required_env in ("JWT_SECRET", "REFRESH_SECRET"):
+        if not os.environ.get(required_env):
+            raise RuntimeError(f"{required_env} environment variable is required")
+
+    # Ensure user DB exists (file + schema).
+    from src.auth.db import ensure_db_initialized
+    await ensure_db_initialized()
+
     config = get_app_config()
 
     # Reset any bags left in "indexing" state from a previous crashed run.
@@ -58,6 +68,8 @@ async def lifespan(fastapi_app: FastAPI):
         indexing_status[bag_path] = "error"
 
     # Resolve compute device once at startup and share across all components.
+    from src.embedding import create_embedder
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Using compute device: %s", device)
 
@@ -65,43 +77,23 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    try:
-        embedding_model = AutoModel.from_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-    except (OSError, ValueError):
-        logger.info("Downloading embedding model for the first time...")
-        embedding_model = AutoModel.from_pretrained(config.models.embedding_model)
-        embedding_model.save_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-
-    try:
-        embedding_model_processor = AutoProcessor.from_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
-    except (OSError, ValueError):
-        logger.info("Downloading embedding model processor for the first time...")
-        embedding_model_processor = AutoProcessor.from_pretrained(
-            config.models.embedding_model
-        )
-        embedding_model_processor.save_pretrained(
-            os.path.join(model_checkpoints_path, config.models.embedding_model)
-        )
+    embedder = create_embedder(config, device=device)
+    logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config
-    fastapi_app.state.embedding_model = embedding_model
-    fastapi_app.state.embedding_model_processor = embedding_model_processor
+    fastapi_app.state.embedder = embedder
 
     fastapi_app.state.component_factory = BackendComponentFactory(
         config=config,
-        embedding_model=embedding_model,
-        embedding_processor=embedding_model_processor,
-        device=device,
+        embedder=embedder,
     )
 
     fastapi_app.state.searcher_instance = (
         fastapi_app.state.component_factory.create_global_searcher()
+    )
+
+    fastapi_app.state.region_searcher_instance = (
+        fastapi_app.state.component_factory.create_region_searcher()
     )
 
     if config.extraction.enabled:
@@ -112,10 +104,12 @@ async def lifespan(fastapi_app: FastAPI):
     yield
 
     logger.info("Server shutting down: clearing model resources")
+    fastapi_app.state.embedder.offload()
     del fastapi_app.state.searcher_instance
+    if getattr(fastapi_app.state, "region_searcher_instance", None) is not None:
+        del fastapi_app.state.region_searcher_instance
     del fastapi_app.state.component_factory
-    del fastapi_app.state.embedding_model_processor
-    del fastapi_app.state.embedding_model
+    del fastapi_app.state.embedder
     del fastapi_app.state.app_config
     gc.collect()
 
@@ -134,6 +128,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(bags_router)
 app.include_router(image_router)
 app.include_router(indexing_router)

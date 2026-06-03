@@ -4,16 +4,16 @@ import logging
 
 from pathlib import Path
 
-import torch
 import lancedb
 
 from PIL import Image
-from transformers import AutoProcessor, AutoModel
 from tqdm import tqdm
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.index_stamp import write_embedder_stamp, write_region_stamp
 from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
+from src.embedding import FrameEmbedder, create_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,12 @@ class Indexer:
         self,
         bag_path: str,
         config: AppConfig | None = None,
-        model=None,
-        processor=None,
-        device: str | None = None,
+        embedder: FrameEmbedder | None = None,
+        region_indexer=None,
     ):
         self.bag_path = Path(bag_path)
         app_config = config or get_app_config()
 
-        self.model_name = app_config.models.embedding_model
         self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
         self.metadata_path = self.artifact_dir / "metadata.json"
         self.db_path = self.artifact_dir / "lancedb"
@@ -40,24 +38,14 @@ class Indexer:
                 f"Metadata not found at {self.metadata_path}. Run extraction first."
             )
 
-        self.device = device if device is not None else (
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
         self.batch_size = app_config.ingestion.batch_size
-
-        self.model = (
-            model.to(self.device)
-            if model is not None
-            else AutoModel.from_pretrained(self.model_name).to(self.device)
-        )
-        self.processor = (
-            processor
-            if processor is not None
-            else AutoProcessor.from_pretrained(self.model_name)
-        )
+        # The embedder is normally injected (shared singleton). Fall back to building
+        # one from config for standalone/CLI use.
+        self.embedder = embedder if embedder is not None else create_embedder(app_config)
+        self._region_indexer = region_indexer
 
     def build_index(self):
-        """Loads SigLIP 2, embeds frames, writes to LanceDB, and frees VRAM."""
+        """Embeds frames via the active embedder, writes LanceDB, and stamps metadata."""
         logger.info("Loading metadata from %s...", self.metadata_path)
         with self.metadata_path.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
@@ -65,66 +53,79 @@ class Indexer:
         schema_version = metadata.get("schema_version", 1)
         if schema_version < METADATA_SCHEMA_VERSION:
             logger.warning(
-                "Metadata schema v%d is older than current v%d; re-index recommended.",
+                "Metadata schema v%d is older than current v%d; re-extract + re-index required.",
                 schema_version,
                 METADATA_SCHEMA_VERSION,
             )
 
-        frames = metadata["frames"]
+        frames = metadata.get("frames", [])
         if not frames:
             logger.warning("No frames found to index.")
             return
 
-        logger.info("Loading %s into GPU (%s)...", self.model_name, self.device)
-        self.model.to(self.device)
-        self.model.eval()
-
         db = lancedb.connect(str(self.db_path))
         table_name = "frames"
-
         data_to_insert = []
+        region_active = self._region_indexer is not None and "dense" in self.embedder.capabilities
 
-        logger.info("Generating embeddings for %s frames...", len(frames))
-        for i in tqdm(range(0, len(frames), self.batch_size)):
-            batch_meta = frames[i : i + self.batch_size]
-            valid_batch_meta = []
-            images = []
-            for meta in batch_meta:
+        logger.info(
+            "Generating embeddings for %s frames with %s (region=%s)...",
+            len(frames), self.embedder.name, region_active,
+        )
+
+        if region_active:
+            # Fused fresh-index loop: one trunk pass per frame → CLS to LanceDB,
+            # value-attention grid to the region indexer.
+            for frame_id, meta in enumerate(tqdm(frames)):
                 abs_path = str(self.artifact_dir / meta["file_path"])
                 try:
                     with Image.open(abs_path) as image:
-                        images.append(image.convert("RGB"))
-                    valid_batch_meta.append({**meta, "_abs_path": abs_path})
+                        img = image.convert("RGB")
                 except (FileNotFoundError, OSError):
                     logger.warning(
-                        "Skipping unreadable frame %s during indexing",
-                        abs_path,
-                        exc_info=True,
+                        "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
                     )
-
-            if not images:
-                continue
-
-            inputs = self.processor(images=images, return_tensors="pt").to(self.device)
-
-            with torch.no_grad():
-                image_features = self.model.get_image_features(**inputs)
-                # L2 Normalize the embeddings for later cosine similarity search
-                embeddings = (
-                    image_features.pooler_output
-                    / image_features.pooler_output.norm(dim=-1, keepdim=True)
-                )
-                embeddings = embeddings.cpu().numpy().tolist()
-
-            for meta, emb in zip(valid_batch_meta, embeddings):
+                    continue
+                (cls, grid), = self.embedder.embed_global_and_dense([img])
                 data_to_insert.append(
                     {
                         "timestamp_ns": meta["timestamp_ns"],
-                        "file_path": meta["_abs_path"],
-                        "topic": metadata["topic"],
-                        "vector": emb,
+                        "file_path": abs_path,
+                        "topic": meta["topic"],
+                        "vector": cls.tolist(),
                     }
                 )
+                self._region_indexer.add_frame(frame_id, grid)
+        else:
+            for i in tqdm(range(0, len(frames), self.batch_size)):
+                batch_meta = frames[i : i + self.batch_size]
+                valid_batch_meta = []
+                images = []
+                for meta in batch_meta:
+                    abs_path = str(self.artifact_dir / meta["file_path"])
+                    try:
+                        with Image.open(abs_path) as image:
+                            images.append(image.convert("RGB"))
+                        valid_batch_meta.append({**meta, "_abs_path": abs_path})
+                    except (FileNotFoundError, OSError):
+                        logger.warning(
+                            "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
+                        )
+
+                if not images:
+                    continue
+
+                embeddings = self.embedder.embed_images(images)
+
+                for meta, emb in zip(valid_batch_meta, embeddings):
+                    data_to_insert.append(
+                        {
+                            "timestamp_ns": meta["timestamp_ns"],
+                            "file_path": meta["_abs_path"],
+                            "topic": meta["topic"],
+                            "vector": emb.tolist(),
+                        }
+                    )
 
         if not data_to_insert:
             logger.warning("No valid frames were embedded; skipping LanceDB write.")
@@ -135,21 +136,33 @@ class Indexer:
             logger.info("Existing index found; overwriting table.")
         db.create_table(table_name, data=data_to_insert, mode="overwrite")
 
-        logger.info(
-            "Index successfully built! Total records in table: %d",
-            len(data_to_insert),
+        # Stamp the index with the embedder identity so the searcher can detect mismatches.
+        write_embedder_stamp(
+            self.metadata_path, name=self.embedder.name, dim=self.embedder.embedding_dim
         )
 
-        self.model.cpu()
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
+        if region_active:
+            patch_count = self._region_indexer.finalize()
+            write_region_stamp(
+                self.metadata_path,
+                name=self.embedder.name,
+                dim=self.embedder.embedding_dim,
+                feature="value-attention",
+                encode_long_side=int(self.embedder.encode_long_side),
+                pq=self._region_indexer.pq_params,
+                patch_count=patch_count,
+            )
+
+        logger.info(
+            "Index built! %d records, stamped %s (dim=%d).",
+            len(data_to_insert),
+            self.embedder.name,
+            self.embedder.embedding_dim,
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Test Index frames from a bag into LanceDB."
-    )
+    parser = argparse.ArgumentParser(description="Index frames from a bag into LanceDB.")
     parser.add_argument("bag_path", type=str, help="Path to the bag directory.")
     args = parser.parse_args()
-    indexer = Indexer(args.bag_path)
-    indexer.build_index()
+    Indexer(args.bag_path).build_index()

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { getBagStatus, indexBag, scanBags } from "../api/client";
@@ -6,12 +6,13 @@ import type { BagInfo } from "../api/types";
 
 const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
 
-export function useBags() {
+export function useBagsState() {
   const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
   const [bags, setBags] = useState<BagInfo[]>([]);
   const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [lastScannedRootDir, setLastScannedRootDir] = useState<string | null>(null);
 
   const indexingBagPaths = useMemo(
     () => bags.filter((bag) => bag.status === "indexing").map((bag) => bag.bag_path),
@@ -19,14 +20,18 @@ export function useBags() {
   );
 
   const onScan = useCallback(async () => {
-    if (!rootDir.trim()) {
+    const trimmedRootDir = rootDir.trim();
+
+    if (!trimmedRootDir) {
       toast.error("Please enter a root directory.");
       return;
     }
 
+    setLastScannedRootDir(null);
     setIsScanning(true);
     try {
-      const data = await scanBags(rootDir.trim());
+      const data = await scanBags(trimmedRootDir);
+      setLastScannedRootDir(trimmedRootDir);
       setBags(data.bags);
       setSelectedBagPaths((prev) =>
         prev.filter((bagPath) => data.bags.some((bag) => bag.bag_path === bagPath)),
@@ -72,6 +77,18 @@ export function useBags() {
     }
   }, []);
 
+  const registerBag = useCallback((bag: BagInfo) => {
+    setBags((prev) => {
+      if (prev.some((b) => b.bag_path === bag.bag_path)) return prev;
+      return [...prev, bag];
+    });
+  }, []);
+
+  const unregisterBag = useCallback((bagPath: string) => {
+    setBags((prev) => prev.filter((b) => b.bag_path !== bagPath));
+    setSelectedBagPaths((prev) => prev.filter((p) => p !== bagPath));
+  }, []);
+
   useEffect(() => {
     if (indexingBagPaths.length === 0) {
       setIsPolling(false);
@@ -92,6 +109,7 @@ export function useBags() {
               ...bag,
               status: next.status,
               is_indexed: next.status === "done" || bag.is_indexed,
+              error_message: next.error_message ?? null,
             };
           }),
         );
@@ -107,6 +125,15 @@ export function useBags() {
     window.localStorage.setItem(ROOT_DIR_STORAGE_KEY, rootDir);
   }, [rootDir]);
 
+  // Auto-scan on mount when rootDir is already persisted from a previous session.
+  const autoScannedRef = useRef(false);
+  useEffect(() => {
+    if (autoScannedRef.current || !rootDir.trim()) return;
+    autoScannedRef.current = true;
+    void onScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     rootDir,
     setRootDir,
@@ -114,9 +141,12 @@ export function useBags() {
     selectedBagPaths,
     isScanning,
     isPolling,
+    lastScannedRootDir,
     onScan,
     onIndex,
     toggleBagSelection,
     toggleAllBags,
+    registerBag,
+    unregisterBag,
   };
 }

@@ -18,10 +18,12 @@ class IndexingService:
         factory: BackendComponentFactory,
         status_store: MutableMapping[str, str],
         searcher: GlobalSearcher | None = None,
+        region_searcher=None,
     ):
         self._factory = factory
         self._status_store = status_store
         self._searcher = searcher
+        self._region_searcher = region_searcher
 
     @staticmethod
     def resolve_and_validate_bag_path(bag_path: str) -> str:
@@ -50,6 +52,10 @@ class IndexingService:
                 db_path = str(indexer.db_path)
                 self._searcher.invalidate_cache(db_path)
                 logger.debug("Invalidated LanceDB cache for %s", db_path)
+            if self._region_searcher is not None:
+                region_dir = str(indexer.artifact_dir / "region")
+                self._region_searcher.invalidate_cache(region_dir)
+                logger.debug("Invalidated region index cache for %s", region_dir)
         except (FileNotFoundError, OSError, RuntimeError, ValueError):
             self._status_store[resolved_bag_path] = "error"
             logger.exception("Indexing failed for %s", resolved_bag_path)

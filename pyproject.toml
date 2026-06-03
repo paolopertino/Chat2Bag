@@ -6,24 +6,31 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "accelerate>=1.12.0",
+    "aiosqlite>=0.20.0",
+    "bcrypt<4",
+    "faiss-cpu>=1.14.2",
     "fastapi>=0.128.0",
     "lancedb>=0.27.1",
     "numpy>=2.2.6",
     "ollama>=0.6.1",
     "opencv-python>=4.13.0.92",
     "pandas>=2.3.3",
+    "passlib[bcrypt]>=1.7.4",
     "pillow>=12.1.0",
     "pyarrow>=23.0.0",
     "pydantic>=2.12.5",
+    "python-jose[cryptography]>=3.3.0",
     "python-multipart>=0.0.22",
     "qwen-vl-utils>=0.0.14",
     "requests>=2.32.5",
     "rosbags>=0.11.0",
     "rosbags-image>=0.10.3",
+    "sentencepiece>=0.2.1",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
     "transformers>=5.0.0",
     "uvicorn>=0.41.0",
+    "xformers>=0.0.35",
 ]
 
 [dependency-groups]
@@ -35,3 +42,4 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]

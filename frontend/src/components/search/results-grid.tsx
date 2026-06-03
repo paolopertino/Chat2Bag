@@ -1,4 +1,3 @@
-import { getImageUrl } from "../../api/client";
 import type { SearchResult } from "../../api/types";
 import { ImageCard } from "./image-card";
 import { Skeleton } from "../ui/skeleton";
@@ -8,9 +7,19 @@ interface ResultsGridProps {
   isSearching: boolean;
   onResultClick?: (result: SearchResult) => void;
   onSimilarSearch?: (result: SearchResult) => void;
+  onUseAsRegionSupport?: (result: SearchResult) => void;
+  /** When provided, each card renders as a `<Link>` enabling Cmd/Ctrl-click → new tab. */
+  getResultHref?: (result: SearchResult) => string;
 }
 
-export function ResultsGrid({ results, isSearching, onResultClick, onSimilarSearch }: ResultsGridProps) {
+export function ResultsGrid({
+  results,
+  isSearching,
+  onResultClick,
+  onSimilarSearch,
+  onUseAsRegionSupport,
+  getResultHref,
+}: ResultsGridProps) {
   if (isSearching) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -35,9 +44,10 @@ export function ResultsGrid({ results, isSearching, onResultClick, onSimilarSear
         <ImageCard
           key={`${result.file_path}:${result.timestamp_ns}`}
           result={result}
-          imageUrl={getImageUrl(result.file_path)}
+          href={getResultHref?.(result)}
           onClick={onResultClick ? () => onResultClick(result) : undefined}
           onSimilarSearch={onSimilarSearch}
+          onUseAsRegionSupport={onUseAsRegionSupport}
         />
       ))}
     </div>

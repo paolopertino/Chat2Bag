@@ -4,9 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_extraction_service
+from src.auth.dependencies import require_current_user
 from src.services.extraction_service import ExtractionService, ExtractionServiceError
 
-router = APIRouter(prefix="/api/datasets", tags=["datasets"])
+router = APIRouter(
+    prefix="/api/datasets",
+    tags=["datasets"],
+    dependencies=[Depends(require_current_user)],
+)
 
 
 class ExtractRequest(BaseModel):

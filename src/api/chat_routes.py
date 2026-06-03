@@ -4,9 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_chat_service
+from src.auth.dependencies import require_current_user
 from src.services.chat_service import ChatService
 
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(
+    prefix="/api",
+    tags=["chat"],
+    dependencies=[Depends(require_current_user)],
+)
 
 
 class ChatRequest(BaseModel):

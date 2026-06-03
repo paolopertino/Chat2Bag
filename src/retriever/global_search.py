@@ -4,14 +4,14 @@ import logging
 from pathlib import Path
 from typing import List
 
-import torch
 import lancedb
 
 from PIL import Image
-from transformers import AutoProcessor, AutoModel
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.index_stamp import is_stamp_compatible, read_embedder_stamp
 from src.core.storage import resolve_artifact_path
+from src.embedding import FrameEmbedder, create_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +20,14 @@ class GlobalSearcher:
     def __init__(
         self,
         config: AppConfig | None = None,
-        model=None,
-        processor=None,
-        device: str | None = None,
+        embedder: FrameEmbedder | None = None,
     ):
         app_config = config or get_app_config()
 
-        self.model_name = app_config.models.embedding_model
         self.temporal_dedup_window_ns = int(
             max(0.0, app_config.search.temporal_dedup_window_sec) * 1_000_000_000
         )
-        self.device = device if device is not None else (
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-
-        logger.info("Loading %s into VRAM (%s)...", self.model_name, self.device)
-        self.model: AutoModel = model.to(self.device)
-        self.processor: AutoProcessor = processor
-        self.model.eval()
-
+        self._embedder = embedder if embedder is not None else create_embedder(app_config)
         self._db_cache: dict[str, lancedb.DBConnection] = {}
 
     def _get_db(self, db_path: str) -> lancedb.DBConnection:
@@ -53,6 +42,24 @@ class GlobalSearcher:
     @staticmethod
     def _sequence_key(result: dict) -> tuple[str, str]:
         return (str(result.get("bag_path", "")), str(result.get("topic", "")))
+
+    def _compatible_bags(self, bag_paths: List[str]) -> list[str]:
+        """Keep only bags whose index stamp matches the active embedder."""
+        keep: list[str] = []
+        for bag_path in bag_paths:
+            meta_path = resolve_artifact_path(bag_path=Path(bag_path)) / "metadata.json"
+            stamp = read_embedder_stamp(meta_path)
+            if is_stamp_compatible(stamp, self._embedder.name, self._embedder.embedding_dim):
+                keep.append(bag_path)
+            else:
+                logger.warning(
+                    "Skipping %s: indexed with %s, active embedder is %s (dim=%d) — re-index to include it.",
+                    Path(bag_path).name,
+                    stamp,
+                    self._embedder.name,
+                    self._embedder.embedding_dim,
+                )
+        return keep
 
     def _apply_temporal_dedup(self, ranked_results: list[dict]) -> list[dict]:
         if self.temporal_dedup_window_ns <= 0:
@@ -69,7 +76,7 @@ class GlobalSearcher:
                     continue
 
                 selected_ts = int(selected.get("timestamp_ns", 0))
-                if abs(candidate_ts - selected_ts) <= self.temporal_dedup_window_ns // 2: # Window is centered around each result, so divide by 2 for comparison.
+                if abs(candidate_ts - selected_ts) <= self.temporal_dedup_window_ns // 2:  # Window is centered around each result, so divide by 2 for comparison.
                     is_redundant = True
                     break
 
@@ -94,14 +101,14 @@ class GlobalSearcher:
         top_k: int,
         exclude_file_path: str | None = None,
     ) -> list[dict]:
-        """Searches a query vector across one or more bag indices."""
+        """Searches a query vector across one or more compatible bag indices."""
 
         exclude_path = None
         if exclude_file_path:
             exclude_path = str(Path(exclude_file_path).expanduser().resolve())
 
         all_results = []
-        for bag_path in bag_paths:
+        for bag_path in self._compatible_bags(bag_paths):
             db_path = resolve_artifact_path(bag_path=Path(bag_path)) / "lancedb"
             if not db_path.exists():
                 logger.warning(
@@ -131,43 +138,15 @@ class GlobalSearcher:
         deduped_results = self._apply_temporal_dedup(all_results)
         return deduped_results[:top_k]
 
-    def _embed_image(self, image: Image.Image) -> list[float]:
-        inputs = self.processor(images=[image], return_tensors="pt").to(self.device)
-
-        with torch.no_grad():
-            inputs = inputs.to(self.device)
-            self.model.to(self.device)
-            image_features = self.model.get_image_features(**inputs).pooler_output
-            image_embeddings = image_features / image_features.norm(dim=-1, keepdim=True)
-            return image_embeddings.cpu().numpy().tolist()[0]
-
     def search(self, query: str, bag_paths: List[str], top_k: int = 5):
         """Embeds text once and searches across multiple LanceDB indices."""
-
         logger.info("Embedding query: '%s'", query)
-        inputs = self.processor(
-            text=[query],
-            padding="max_length",
-            truncation=True,
-            max_length=64,
-            return_tensors="pt",
-        ).to(self.device)
-
-        with torch.no_grad():
-            inputs = inputs.to(self.device)
-            self.model.to(self.device)
-            text_features = self.model.get_text_features(**inputs)
-            text_embeddings = (
-                text_features.pooler_output
-                / text_features.pooler_output.norm(dim=-1, keepdim=True)
-            )
-            query_vector = text_embeddings.cpu().numpy().tolist()[0]
-
+        query_vector = self._embedder.embed_text([query])[0].tolist()
         return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k)
 
     def search_by_image_bytes(self, image_bytes: bytes, bag_paths: List[str], top_k: int = 5):
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        query_vector = self._embed_image(image=image)
+        query_vector = self._embedder.embed_images([image])[0].tolist()
         return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k)
 
     def search_similar_by_file_path(
@@ -178,7 +157,7 @@ class GlobalSearcher:
     ):
         image_path = Path(file_path).expanduser().resolve()
         image = Image.open(image_path).convert("RGB")
-        query_vector = self._embed_image(image=image)
+        query_vector = self._embedder.embed_images([image])[0].tolist()
         return self._search_vector(
             query_vector=query_vector,
             bag_paths=bag_paths,

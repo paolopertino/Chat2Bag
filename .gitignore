@@ -17,3 +17,13 @@ static/
 
 # App generated artifacts
 .bag_gpt_state.json
+
+# Brainstorming session content
+.superpowers/
+
+# Runtime data and logs
+data/
+indexing_errors.json
+
+# Claude Code local settings (keep commands/ tracked)
+.claude/settings.local.json
