@@ -1,6 +1,6 @@
-import { ArrowLeft, Download, LoaderCircle, MessageSquare, MessageSquareOff } from "lucide-react";
+import { ArrowLeft, Crosshair, Download, LoaderCircle, MessageSquare, MessageSquareOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getBagInfo, getBagStatus } from "../../api/client";
@@ -48,6 +48,7 @@ export function BagDetailPage() {
     unregisterBag,
   } = ctx;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { bagPath, error: decodeError } = useDecodedBagPath();
   const { schema, extractionEnabled, refresh } = useJobs();
 
@@ -372,6 +373,21 @@ export function BagDetailPage() {
         />
       </div>
       <div className="flex flex-shrink-0 items-center gap-2">
+        {viewerState.activeFrame?.file_path ? (
+          <Button
+            variant="outline"
+            size="sm"
+            title="Use this frame as a region-search support image"
+            onClick={() =>
+              navigate(
+                `/search?mode=region&support=${encodeURIComponent(viewerState.activeFrame!.file_path)}`,
+              )
+            }
+          >
+            <Crosshair className="mr-1.5 h-3.5 w-3.5" />
+            Search region
+          </Button>
+        ) : null}
         {extractionEnabled ? (
           <Button variant="outline" size="sm" onClick={handleExtractDataset}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
@@ -395,8 +411,11 @@ export function BagDetailPage() {
   );
 
   const hiddenPinCount = search.rawResultCount - search.results.length;
+  // Image search populates results without setting q/similar (it never touches the
+  // URL), so also show the rail when there are raw results — otherwise image-search
+  // pins stay hidden while text-search pins show.
   const pinRail =
-    search.q || search.similar ? (
+    search.q || search.similar || search.rawResultCount > 0 ? (
       <div className="space-y-2">
         <FilterChip
           topK={search.topK}

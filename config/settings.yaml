@@ -14,6 +14,7 @@ storage:
 embedding:
   backend: "tipsv2"                                                                         # Registry key: siglip2 | tipsv2
   model: "google/tipsv2-l14"                                                                # HF id or local checkpoint path for the active backend.
+  encode_long_side: 896                                                                     # Shared CLS + dense encode geometry (long edge, floored to /14). Tunable; changing it re-indexes both CLS and Region.
 
 models:
   orchestration_llm: "gemma-2-9b"
@@ -22,6 +23,28 @@ models:
 
 search:
   temporal_dedup_window_sec: 20.0                                                             # Suppress lower-scoring hits from the same bag/topic sequence within +/- this temporal window around a better-scoring frame.
+
+region_search:
+  enabled: true                 # gated by embedder 'dense' capability; off => no dense pass, no RegionSearcher
+  engine: faiss                 # faiss | (future) turbovec
+  pq: { m: 64, nbits: 8 }
+  ivf: { nlist: null, nprobe: 16 }   # nlist null => auto = n_patches // 4096
+  min_patches_for_pq: 10000     # below => exact IndexFlatIP fallback (no training)
+  train_sample_cap: 262144      # max Patches used to train IVF-PQ
+  patch_fetch_limit: 4096       # patches pulled per bag before group->max
+  aggregation: { top_k_patches: 1 }  # 1 == MaxSim; >1 == top-k mean
+  refine: { enabled: false, top_n: 100 }
+  text_templates:               # ~10-template dashcam ensemble (full-80 / single are A/B alternatives)
+    - "a photo of a {}."
+    - "a photo of the {}."
+    - "a cropped photo of a {}."
+    - "a close-up photo of a {}."
+    - "a bright photo of a {}."
+    - "a dark photo of a {}."
+    - "a blurry photo of a {}."
+    - "a low resolution photo of a {}."
+    - "a jpeg corrupted photo of a {}."
+    - "a photo of a hard to see {}."
 
 api:
   scan_timeout_sec: 30.0                                                                      # Maximum seconds allowed for a recursive bag directory scan before returning 504.

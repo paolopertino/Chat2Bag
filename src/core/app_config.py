@@ -31,6 +31,7 @@ class ModelsConfig:
 class EmbeddingConfig:
     backend: str
     model: str
+    encode_long_side: int
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,23 @@ class ApiConfig:
 
 
 @dataclass(frozen=True)
+class RegionSearchConfig:
+    enabled: bool
+    engine: str
+    pq_m: int
+    pq_nbits: int
+    ivf_nlist: Optional[int]
+    ivf_nprobe: int
+    min_patches_for_pq: int
+    train_sample_cap: int
+    patch_fetch_limit: int
+    top_k_patches: int
+    refine_enabled: bool
+    refine_top_n: int
+    text_templates: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class AppConfig:
     ingestion: IngestionConfig
     storage: StorageConfig
@@ -51,6 +69,7 @@ class AppConfig:
     embedding: EmbeddingConfig
     search: SearchConfig
     api: ApiConfig
+    region_search: RegionSearchConfig
     extraction: ExtractionConfig
 
 
@@ -65,6 +84,44 @@ def _parse_extraction_config(raw: Optional[dict]) -> ExtractionConfig:
         editable_fields=tuple(raw.get("editable_fields", [])),
         fixed_overrides=dict(raw.get("fixed_overrides") or {}),
         path_strip_prefix=str(raw["path_strip_prefix"]) if raw.get("path_strip_prefix") else None,
+    )
+
+
+_DEFAULT_TEMPLATES = (
+    "a photo of a {}.",
+    "a photo of the {}.",
+    "a cropped photo of a {}.",
+    "a close-up photo of a {}.",
+    "a bright photo of a {}.",
+    "a dark photo of a {}.",
+    "a blurry photo of a {}.",
+    "a low resolution photo of a {}.",
+    "a jpeg corrupted photo of a {}.",
+    "a photo of a hard to see {}.",
+)
+
+
+def _parse_region_search_config(raw: Optional[dict]) -> RegionSearchConfig:
+    raw = raw or {}
+    pq = raw.get("pq") or {}
+    ivf = raw.get("ivf") or {}
+    agg = raw.get("aggregation") or {}
+    refine = raw.get("refine") or {}
+    templates = raw.get("text_templates")
+    return RegionSearchConfig(
+        enabled=bool(raw.get("enabled", True)),
+        engine=str(raw.get("engine", "faiss")),
+        pq_m=int(pq.get("m", 64)),
+        pq_nbits=int(pq.get("nbits", 8)),
+        ivf_nlist=(int(ivf["nlist"]) if ivf.get("nlist") is not None else None),
+        ivf_nprobe=int(ivf.get("nprobe", 16)),
+        min_patches_for_pq=int(raw.get("min_patches_for_pq", 10_000)),
+        train_sample_cap=int(raw.get("train_sample_cap", 262_144)),
+        patch_fetch_limit=int(raw.get("patch_fetch_limit", 4096)),
+        top_k_patches=int(agg.get("top_k_patches", 1)),
+        refine_enabled=bool(refine.get("enabled", False)),
+        refine_top_n=int(refine.get("top_n", 100)),
+        text_templates=tuple(templates) if templates else _DEFAULT_TEMPLATES,
     )
 
 
@@ -91,6 +148,7 @@ def get_app_config() -> AppConfig:
         embedding=EmbeddingConfig(
             backend=str(settings["embedding"]["backend"]),
             model=str(settings["embedding"]["model"]),
+            encode_long_side=int(settings["embedding"].get("encode_long_side", 896)),
         ),
         search=SearchConfig(
             temporal_dedup_window_sec=float(
@@ -102,5 +160,6 @@ def get_app_config() -> AppConfig:
                 settings.get("api", {}).get("scan_timeout_sec", 30.0)
             ),
         ),
+        region_search=_parse_region_search_config(settings.get("region_search")),
         extraction=_parse_extraction_config(settings.get("extraction")),
     )

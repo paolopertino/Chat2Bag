@@ -36,3 +36,31 @@ class FakeEmbedder(FrameEmbedder):
 
     def offload(self) -> None:
         return None
+
+
+class FakeDenseEmbedder(FakeEmbedder):
+    """Region-capable fake: deterministic CLS + a small patch grid per image."""
+
+    def __init__(self, dim: int = 4, name: str = "fake-dense:test", encode_long_side: int = 56):
+        super().__init__(dim=dim, name=name)
+        self._encode_long_side = encode_long_side
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset({"global", "text", "dense"})
+
+    @property
+    def encode_long_side(self) -> int | None:
+        return self._encode_long_side
+
+    def embed_global_and_dense(self, images):
+        out = []
+        for i, _ in enumerate(images):
+            cls = np.eye(self._dim, dtype=np.float32)[i % self._dim]
+            grid = np.zeros((2, 3, self._dim), dtype=np.float32)  # 6 patches
+            grid[..., (i % self._dim)] = 1.0
+            out.append((cls, grid))
+        return out
+
+    def embed_dense(self, images):
+        return [grid for _, grid in self.embed_global_and_dense(images)]

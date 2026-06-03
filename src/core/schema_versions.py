@@ -10,6 +10,8 @@ Version history:
   3 — Flat per-camera frames (per-frame `topic`, top-level `cameras[]`), embedder
       stamp slot (`{name, dim}` | null), aspect-preserving thumbnails under
       per-camera subdirectories.
+  4 — Adds optional `region_index` stamp (Region search faiss patch index);
+      CLS frame layout unchanged from v3.
 """
 
-METADATA_SCHEMA_VERSION = 3
+METADATA_SCHEMA_VERSION = 4

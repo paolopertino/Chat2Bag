@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Search } from "lucide-react";
+import { Crosshair, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import type { SearchResult } from "../../api/types";
@@ -18,9 +18,11 @@ interface ImageCardProps {
   href?: string;
   onClick?: () => void;
   onSimilarSearch?: (result: SearchResult) => void;
+  /** Region mode: promote this frame to a region support image. */
+  onUseAsRegionSupport?: (result: SearchResult) => void;
 }
 
-export function ImageCard({ result, href, onClick, onSimilarSearch }: ImageCardProps) {
+export function ImageCard({ result, href, onClick, onSimilarSearch, onUseAsRegionSupport }: ImageCardProps) {
   const filePath = result.file_path;
   const [hasImageError, setHasImageError] = useState(false);
   const handleImageError = useCallback(() => setHasImageError(true), []);
@@ -45,11 +47,7 @@ export function ImageCard({ result, href, onClick, onSimilarSearch }: ImageCardP
           {imageArea}
         </Link>
       ) : (
-        <button
-          type="button"
-          onClick={onClick}
-          className="block w-full cursor-pointer text-left"
-        >
+        <button type="button" onClick={onClick} className="block w-full cursor-pointer text-left">
           {imageArea}
         </button>
       )}
@@ -60,20 +58,40 @@ export function ImageCard({ result, href, onClick, onSimilarSearch }: ImageCardP
             <p className="font-mono text-xs text-[var(--ink-soft)]">score {(result.similarity_score * 100).toFixed(2)}%</p>
             <p className="font-mono text-xs text-[var(--ink-soft)]">t = {formatTimestampNs(result.timestamp_ns)}</p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            title="Find similar images"
-            aria-label="Find similar images"
-            onClick={(event) => {
-              event.stopPropagation();
-              onSimilarSearch?.(result);
-            }}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {onUseAsRegionSupport ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Use as region support"
+                aria-label="Use as region support"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onUseAsRegionSupport(result);
+                }}
+              >
+                <Crosshair className="h-4 w-4" />
+              </Button>
+            ) : null}
+            {onSimilarSearch ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Find similar images"
+                aria-label="Find similar images"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSimilarSearch(result);
+                }}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
         </div>
       </CardContent>
     </Card>
