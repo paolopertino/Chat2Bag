@@ -1,10 +1,13 @@
 import json
 import logging
+
 from collections import defaultdict
 from pathlib import Path
 from typing import List
 
 import numpy as np
+
+from PIL import Image
 
 from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_region_stamp_compatible, read_region_stamp
@@ -135,8 +138,6 @@ class RegionSearcher:
 
     def _refine(self, q: np.ndarray, results: list[dict]) -> list[dict]:
         """Recompute exact MaxSim for each result from its thumbnail (compute, not storage)."""
-        from PIL import Image
-
         q = q.reshape(-1)
         for res in results:
             try:
@@ -159,8 +160,6 @@ class RegionSearcher:
     def heatmap(self, q: np.ndarray, target_file_path: str) -> dict:
         """Recompute the target frame's value-attention patches and return the
         (H_p, W_p) cosine grid vs q. Independent of any index."""
-        from PIL import Image
-
         q = q.reshape(-1)
         with Image.open(target_file_path) as im:
             grid = self._embedder.embed_dense([im.convert("RGB")])[0]  # (H_p, W_p, dim)
