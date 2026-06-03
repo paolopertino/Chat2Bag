@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface FilterChipProps {
   topK: number;
-  minScore: number;
+  minScore?: number;
   /** Total raw hits returned from backend (before client-side filter). */
   rawResultCount: number;
   /** How many bags were searched (display only). */
@@ -11,7 +11,7 @@ interface FilterChipProps {
   /** Whether to show the topK slider (false on per-bag search). */
   showTopK?: boolean;
   onTopKChange: (k: number) => void;
-  onMinScoreChange: (s: number) => void;
+  onMinScoreChange?: (s: number) => void;
 }
 
 export function FilterChip({
@@ -49,9 +49,9 @@ export function FilterChip({
               K=<strong>{topK}</strong>
             </span>
           ) : null}
-          <span>
-            ≥<strong>{minScore.toFixed(2)}</strong>
-          </span>
+          {minScore !== undefined ? (
+            <span>≥<strong>{minScore.toFixed(2)}</strong></span>
+          ) : null}
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -82,20 +82,22 @@ export function FilterChip({
               />
             </label>
           ) : null}
-          <label className="block">
-            <span className="mb-1 block text-[var(--ink-soft)]">
-              Min similarity: {minScore.toFixed(2)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={minScore}
-              onChange={(e) => onMinScoreChange(Number(e.target.value))}
-              className="w-full accent-[var(--teal)]"
-            />
-          </label>
+          {minScore !== undefined && onMinScoreChange ? (
+            <label className="block">
+              <span className="mb-1 block text-[var(--ink-soft)]">
+                Min similarity: {minScore.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={minScore}
+                onChange={(e) => onMinScoreChange(Number(e.target.value))}
+                className="w-full accent-[var(--teal)]"
+              />
+            </label>
+          ) : null}
         </div>
       ) : null}
     </div>

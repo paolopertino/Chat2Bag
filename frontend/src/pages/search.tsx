@@ -5,8 +5,10 @@ import { toast } from "sonner";
 
 import type { Point, SearchResult } from "../api/types";
 import { ResultsGrid } from "../components/search/results-grid";
+import { AreaChip } from "../components/search/area-chip";
 import { BagPickerChip } from "../components/search/bag-picker-chip";
 import { FilterChip } from "../components/search/filter-chip";
+import { MapAreaDialog } from "../components/search/map-area-dialog";
 import { RegionResultLightbox } from "../components/search/region-result-lightbox";
 import { RegionSupportChip } from "../components/search/region-support-chip";
 import { RegionSupportDialog, type RegionSupport } from "../components/search/region-support-dialog";
@@ -15,7 +17,10 @@ import { SearchModeToggle, type SearchMode } from "../components/search/search-m
 import { Button } from "../components/ui/button";
 import { useBags } from "../context/bags-context";
 import { useRegionSearch } from "../hooks/use-region-search";
+import { useBagTracks } from "../hooks/use-bag-tracks";
+import { useMapArea } from "../hooks/use-map-area";
 import { useUrlSearch } from "../hooks/use-url-search";
+import { countInArea } from "../lib/area-geo";
 import { encodeBagId } from "../lib/bag-id";
 
 const EXAMPLES = ["pedestrian on the crosswalk", "parked car", "traffic light"];
@@ -31,6 +36,12 @@ export function SearchPage() {
 
   const search = useUrlSearch();
   const region = useRegionSearch();
+
+  const { area, setArea, clearArea } = useMapArea();
+  const { tracksForSelected } = useBagTracks(search.bagPaths);
+  const [mapOpen, setMapOpen] = useState(false);
+  const locatedBagCount = bags.filter((b) => b.is_located).length;
+  const areaCount = area ? countInArea(area, tracksForSelected()) : null;
 
   const [globalDraft, setGlobalDraft] = useState(search.q);
   const [regionDraft, setRegionDraft] = useState("");
@@ -163,6 +174,7 @@ export function SearchPage() {
   const regionResults = region.results.filter((r) => (r.similarity_score ?? 1) >= search.minScore);
   const hasGlobalQuery = search.q !== "" || search.similar !== "";
   const hasRegionQuery = region.query !== null;
+  const isBrowse = mode === "global" && !hasGlobalQuery && area !== null;
   const hidden = search.rawResultCount - search.results.length;
 
   return (
@@ -206,6 +218,13 @@ export function SearchPage() {
           )}
         </div>
         <BagPickerChip selectedBagIds={search.urlBags} onChange={(ids) => search.setBags(ids)} />
+        <AreaChip
+          area={area}
+          count={areaCount}
+          disabled={locatedBagCount === 0}
+          onEdit={() => setMapOpen(true)}
+          onClear={clearArea}
+        />
       </div>
 
       {mode === "region" && region.query && region.query.kind !== "text" ? (
@@ -217,19 +236,19 @@ export function SearchPage() {
         />
       ) : null}
 
-      {(mode === "global" && hasGlobalQuery) || (mode === "region" && hasRegionQuery) ? (
+      {(mode === "global" && (hasGlobalQuery || isBrowse)) || (mode === "region" && hasRegionQuery) ? (
         <FilterChip
           topK={search.topK}
-          minScore={search.minScore}
+          minScore={isBrowse ? undefined : search.minScore}
           rawResultCount={mode === "global" ? search.rawResultCount : region.results.length}
           bagCount={search.bagPaths.length || indexedCount}
           onTopKChange={search.setTopK}
-          onMinScoreChange={search.setMinScore}
+          onMinScoreChange={isBrowse ? undefined : search.setMinScore}
         />
       ) : null}
 
       {mode === "global" ? (
-        !hasGlobalQuery ? (
+        !hasGlobalQuery && !isBrowse ? (
           <EmptyState
             indexedCount={indexedCount}
             onPick={(text) => {
@@ -282,6 +301,14 @@ export function SearchPage() {
         initialPoints={dialogInitialPoints}
         onClose={() => setDialogOpen(false)}
         onConfirm={handleConfirmSupport}
+      />
+
+      <MapAreaDialog
+        open={mapOpen}
+        initialArea={area}
+        tracks={tracksForSelected()}
+        onClose={() => setMapOpen(false)}
+        onConfirm={(next) => { setMapOpen(false); setArea(next); }}
       />
 
       {lightboxIndex !== null && regionResults[lightboxIndex] ? (

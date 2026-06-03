@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import { search, searchByImage, searchSimilar } from "../api/client";
-import type { SearchResult } from "../api/types";
+import { search, searchByImage, searchMap, searchSimilar } from "../api/client";
+import type { Area, SearchResult } from "../api/types";
 
 export function useSearch() {
   const [query, setQuery] = useState("");
@@ -13,7 +13,7 @@ export function useSearch() {
   const clearResults = useCallback(() => setResults([]), []);
 
   const runSearch = useCallback(
-    async (bagPaths: string[], queryOverride?: string, topKOverride?: number) => {
+    async (bagPaths: string[], queryOverride?: string, topKOverride?: number, area?: Area) => {
       const q = queryOverride !== undefined ? queryOverride : query;
       const k = topKOverride !== undefined ? topKOverride : topK;
       if (!q.trim()) {
@@ -31,6 +31,7 @@ export function useSearch() {
           query: q.trim(),
           bag_paths: bagPaths,
           top_k: k,
+          area,
         });
         setResults(response.results);
       } catch (error) {
@@ -41,6 +42,27 @@ export function useSearch() {
       }
     },
     [query, topK],
+  );
+
+  const runMapBrowse = useCallback(
+    async (area: Area, bagPaths: string[], topKOverride?: number) => {
+      const k = topKOverride !== undefined ? topKOverride : topK;
+      if (bagPaths.length === 0) {
+        toast.error("Select at least one bag.");
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const response = await searchMap(area, bagPaths, k);
+        setResults(response.results);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Map browse failed.";
+        toast.error(message);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [topK],
   );
 
   const runImageSearch = useCallback(
@@ -106,5 +128,6 @@ export function useSearch() {
     runSearch,
     runImageSearch,
     runSimilarSearch,
+    runMapBrowse,
   };
 }
