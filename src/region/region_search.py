@@ -13,6 +13,8 @@ from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_region_stamp_compatible, read_region_stamp
 from src.core.storage import resolve_artifact_path
 from src.embedding import FrameEmbedder, create_embedder
+from src.geo.area import area_from_payload
+from src.geo.locator import frames_in_area
 from src.region.faiss_index import FaissPatchIndex
 from src.region.query import build_query_from_points, build_query_from_text
 
@@ -87,15 +89,22 @@ class RegionSearcher:
         return self._index_cache[key]
 
     def search_by_q(
-        self, q: np.ndarray, bag_paths: List[str], top_k: int = 5, exclude_file_path: str | None = None
+        self, q: np.ndarray, bag_paths: List[str], top_k: int = 5,
+        exclude_file_path: str | None = None, area: dict | None = None,
     ) -> list[dict]:
         exclude_path = str(Path(exclude_file_path).expanduser().resolve()) if exclude_file_path else None
         top_k_patches = max(1, self._cfg.top_k_patches)
+        area_obj = area_from_payload(area)
         all_results: list[dict] = []
 
         for bag_path, artifact, frames in self._compatible_region_bags(bag_paths):
             index = self._get_index(artifact / "region")
-            frame_ids, scores = index.search(q, self._cfg.patch_fetch_limit)
+            allowed_frame_ids = None
+            if area_obj is not None:
+                allowed_frame_ids = set(frames_in_area(area_obj, frames))
+                if not allowed_frame_ids:
+                    continue  # no in-area frames in this bag
+            frame_ids, scores = index.search(q, self._cfg.patch_fetch_limit, allowed_frame_ids=allowed_frame_ids)
             if frame_ids.size == 0:
                 continue
 
@@ -149,13 +158,13 @@ class RegionSearcher:
             res["similarity_score"] = float(np.max(sims))
         return results
 
-    def search_by_points(self, image, points, bag_paths, top_k=5, exclude_file_path=None):
+    def search_by_points(self, image, points, bag_paths, top_k=5, exclude_file_path=None, area=None):
         q = build_query_from_points(image, points, self._embedder)
-        return self.search_by_q(q, bag_paths, top_k, exclude_file_path)
+        return self.search_by_q(q, bag_paths, top_k, exclude_file_path, area=area)
 
-    def search_by_text(self, text, bag_paths, top_k=5):
+    def search_by_text(self, text, bag_paths, top_k=5, area=None):
         q = build_query_from_text(text, self._embedder, self._cfg.text_templates)
-        return self.search_by_q(q, bag_paths, top_k)
+        return self.search_by_q(q, bag_paths, top_k, area=area)
 
     def heatmap(self, q: np.ndarray, target_file_path: str) -> dict:
         """Recompute the target frame's value-attention patches and return the
