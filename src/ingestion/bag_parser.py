@@ -12,8 +12,10 @@ from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.index_stamp import build_gps_stamp
 from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
+from src.ingestion.gps import fix_from_navsatfix, locate_frames
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,8 @@ class BagParser:
         self.topics = tuple(app_config.ingestion.camera_topics)
         self.fps = app_config.ingestion.sampling_fps
         self.long_side = app_config.ingestion.long_side
+        self.gps_topic = app_config.ingestion.gps_topic
+        self.gps_max_gap_ns = int(app_config.ingestion.gps_max_gap_sec * 1e9)
 
         # Set up the artifact directories
         self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
@@ -65,6 +69,7 @@ class BagParser:
             "bag_name": self.bag_path.name,
             "cameras": [],
             "embedder": None,
+            "gps": None,
             "frames": [],
         }
 
@@ -74,14 +79,21 @@ class BagParser:
         saved_count = 0
 
         with Reader(self.bag_path) as reader:
-            connections = [c for c in reader.connections if c.topic in self.topics]
-            present_topics = sorted({c.topic for c in connections})
+            camera_connections = [c for c in reader.connections if c.topic in self.topics]
+            present_topics = sorted({c.topic for c in camera_connections})
             if not present_topics:
                 raise ValueError(
                     f"None of the configured camera topics {list(self.topics)} "
                     f"found in {self.bag_path.name}"
                 )
             metadata["cameras"] = present_topics
+
+            gps_connections = (
+                [c for c in reader.connections if c.topic == self.gps_topic]
+                if self.gps_topic else []
+            )
+            connections = camera_connections + gps_connections
+            fixes: list = []
 
             for topic in present_topics:
                 (self.thumbnail_dir / camera_slug(topic)).mkdir(parents=True, exist_ok=True)
@@ -95,6 +107,17 @@ class BagParser:
 
             for connection, timestamp_ns, rawdata in reader.messages(connections=connections):
                 topic = connection.topic
+
+                if self.gps_topic and topic == self.gps_topic:
+                    try:
+                        gps_msg = self.typestore.deserialize_cdr(rawdata, connection.msgtype)
+                        fix = fix_from_navsatfix(gps_msg, timestamp_ns)
+                        if fix is not None:
+                            fixes.append(fix)
+                    except (ValueError, KeyError, RuntimeError):
+                        logger.warning("Skipping unparseable GPS message at %s", timestamp_ns, exc_info=True)
+                    continue
+
                 prev = last_saved_ns.get(topic)
                 if prev is not None and (timestamp_ns - prev) < interval_ns:
                     continue
@@ -126,6 +149,17 @@ class BagParser:
                         exc_info=True,
                     )
                     continue
+
+        if self.gps_topic and gps_connections:
+            located = locate_frames(metadata["frames"], fixes, self.gps_max_gap_ns)
+            metadata["gps"] = build_gps_stamp(
+                topic=self.gps_topic,
+                max_gap_sec=self.gps_max_gap_ns / 1e9,
+                fix_count=len(fixes),
+                located_frame_count=located,
+                frame_count=len(metadata["frames"]),
+            )
+            logger.info("GPS: %d fixes, %d/%d frames located", len(fixes), located, len(metadata["frames"]))
 
         # Write the metadata mapping file
         metadata_path = self.artifact_dir / "metadata.json"
