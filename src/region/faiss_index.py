@@ -92,15 +92,37 @@ class FaissPatchIndex:
         obj._patch_frames = patch_frames
         return obj
 
-    def search(self, q: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+    def search(self, q: np.ndarray, k: int, *, allowed_frame_ids=None) -> tuple[np.ndarray, np.ndarray]:
         assert self._index is not None and self._patch_frames is not None, "index not built/loaded"
         q = np.ascontiguousarray(q.reshape(1, -1), dtype=np.float32)
+
+        params = None
+        if allowed_frame_ids is not None:
+            allowed = np.fromiter((int(f) for f in allowed_frame_ids), dtype=np.int32)
+            if allowed.size == 0:
+                return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float32)
+            rows = np.where(np.isin(np.asarray(self._patch_frames), allowed))[0].astype(np.int64)
+            if rows.size == 0:
+                return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float32)
+            self._selector_rows = rows  # keep a reference alive for the C++ selector
+            selector = faiss.IDSelectorBatch(rows)
+            if isinstance(self._index, faiss.IndexIVF):
+                params = faiss.SearchParametersIVF()
+                params.nprobe = self._index.nlist  # exhaustive: restores small-Area recall (spike 2026-06-03)
+                params.sel = selector
+            else:
+                params = faiss.SearchParameters()
+                params.sel = selector
+
         k = min(int(k), self._index.ntotal)
-        scores, rows = self._index.search(q, k)  # (1, k)
-        rows = rows[0]
+        if params is not None:
+            scores, rows_out = self._index.search(q, k, params=params)
+        else:
+            scores, rows_out = self._index.search(q, k)
+        rows_out = rows_out[0]
         scores = scores[0]
-        valid = rows >= 0
-        rows = rows[valid]
+        valid = rows_out >= 0
+        rows_out = rows_out[valid]
         scores = scores[valid]
-        frame_ids = np.asarray(self._patch_frames)[rows].astype(np.int32)
+        frame_ids = np.asarray(self._patch_frames)[rows_out].astype(np.int32)
         return frame_ids, scores.astype(np.float32)
