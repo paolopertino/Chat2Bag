@@ -29,14 +29,23 @@ def frames_in_area(area: Area, frames: list[dict]) -> list[int]:
     return out
 
 
-def located_frames_in_area(area: Area, frames: list[dict]) -> list[LocatedFrame]:
-    """Return LocatedFrame rows for the in-area frames of one bag."""
+def located_frames_in_area(
+    area: Area, frames: list[dict], artifact_dir: Path | None = None,
+) -> list[LocatedFrame]:
+    """Return LocatedFrame rows for the in-area frames of one bag.
+
+    When `artifact_dir` is given, `file_path` is resolved to the ABSOLUTE on-disk
+    path (`<artifact_dir>/<relative>`) — matching the LanceDB `file_path` column the
+    Global compose IN-list filters on and the absolute path `/api/image` serves for
+    browse previews. Without it the relative metadata path is kept (unit-test use).
+    """
     result: list[LocatedFrame] = []
     for frame_id in frames_in_area(area, frames):
         f = frames[frame_id]
+        file_path = str(artifact_dir / f["file_path"]) if artifact_dir is not None else f["file_path"]
         result.append(LocatedFrame(
             frame_id=frame_id,
-            file_path=f["file_path"],
+            file_path=file_path,
             topic=f["topic"],
             timestamp_ns=int(f["timestamp_ns"]),
             lat=float(f["lat"]),
@@ -45,15 +54,25 @@ def located_frames_in_area(area: Area, frames: list[dict]) -> list[LocatedFrame]
     return result
 
 
-def _load_frames(bag_path: str) -> list[dict]:
-    meta_path = resolve_artifact_path(bag_path=Path(bag_path)) / "metadata.json"
+def _artifact_and_frames(bag_path: str) -> tuple[Path, list[dict]]:
+    artifact = resolve_artifact_path(bag_path=Path(bag_path))
+    meta_path = artifact / "metadata.json"
     try:
         with meta_path.open("r", encoding="utf-8") as handle:
-            return json.load(handle).get("frames", [])
+            return artifact, json.load(handle).get("frames", [])
     except (FileNotFoundError, OSError, json.JSONDecodeError):
-        return []
+        return artifact, []
 
 
 def resolve_area_to_frames(area: Area, bag_paths: list[str]) -> dict[str, list[LocatedFrame]]:
-    """For each bag: read metadata.json and return its in-area LocatedFrames."""
-    return {bag_path: located_frames_in_area(area, _load_frames(bag_path)) for bag_path in bag_paths}
+    """For each bag: read metadata.json and return its in-area LocatedFrames.
+
+    `file_path` is the ABSOLUTE on-disk path so it matches the LanceDB `file_path`
+    column (Global compose IN-list) and is directly fetchable via `/api/image`
+    (browse tile previews).
+    """
+    out: dict[str, list[LocatedFrame]] = {}
+    for bag_path in bag_paths:
+        artifact, frames = _artifact_and_frames(bag_path)
+        out[bag_path] = located_frames_in_area(area, frames, artifact_dir=artifact)
+    return out

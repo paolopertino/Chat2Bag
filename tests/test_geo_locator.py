@@ -39,8 +39,10 @@ def test_resolve_area_to_frames_per_bag_and_frame_id(tmp_path, monkeypatch):
     out = resolve_area_to_frames(area, [str(bag)])
     located = out[str(bag)]
     assert len(located) == 1
+    # file_path is ABSOLUTE — it must match the LanceDB `file_path` column (Global
+    # compose IN-list) and be directly fetchable via /api/image (browse previews).
     assert located[0] == LocatedFrame(
-        frame_id=0, file_path="thumbnails/c/f10.jpg", topic="/c",
+        frame_id=0, file_path=str(artifact / "thumbnails/c/f10.jpg"), topic="/c",
         timestamp_ns=10, lat=45.0, lon=10.0,
     )
 
