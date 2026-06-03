@@ -1,7 +1,36 @@
 import math
 from types import SimpleNamespace
 
-from src.ingestion.gps import Fix, fix_from_navsatfix, locate_frames
+from src.ingestion.gps import Fix, fix_from_navsatfix, locate_frames, read_fixes
+
+
+class _FakeConnection:
+    def __init__(self, topic, msgtype):
+        self.topic = topic
+        self.msgtype = msgtype
+
+
+class _FakeReader:
+    """Minimal rosbags-Reader stand-in: .connections + .messages(connections=...)."""
+
+    def __init__(self, messages):
+        # messages: list of (topic, msgtype, timestamp_ns, deserialized_msg)
+        self._messages = messages
+        self.connections = [_FakeConnection(t, mt) for (t, mt, _, _) in messages]
+
+    def messages(self, connections=None):
+        wanted = {c.topic for c in connections} if connections is not None else None
+        for topic, msgtype, ts, msg in self._messages:
+            if wanted is None or topic in wanted:
+                yield _FakeConnection(topic, msgtype), ts, msg
+
+
+class _FakeTypestore:
+    def __init__(self, by_raw):
+        self._by_raw = by_raw  # maps the placeholder rawdata back to a msg
+
+    def deserialize_cdr(self, rawdata, msgtype):
+        return self._by_raw[rawdata]
 
 
 def _navsatfix(lat, lon, status=2):
@@ -50,3 +79,17 @@ def test_locate_no_fixes_is_noop():
     frames = [{"timestamp_ns": 1, "topic": "/c", "file_path": "a.jpg"}]
     assert locate_frames(frames, [], max_gap_ns=1_000_000_000) == 0
     assert "lat" not in frames[0]
+
+
+def test_read_fixes_filters_to_topic_and_validity():
+    good = _navsatfix(45.0, 10.0, status=2)
+    bad = _navsatfix(45.0, 10.0, status=-1)
+    msgs = [
+        ("/oxts/nav_sat_fix", "sensor_msgs/msg/NavSatFix", 100, "RAW_GOOD"),
+        ("/cam", "sensor_msgs/msg/Image", 150, "RAW_IMG"),
+        ("/oxts/nav_sat_fix", "sensor_msgs/msg/NavSatFix", 200, "RAW_BAD"),
+    ]
+    reader = _FakeReader(msgs)
+    ts = _FakeTypestore({"RAW_GOOD": good, "RAW_BAD": bad, "RAW_IMG": object()})
+    fixes = read_fixes(reader, "/oxts/nav_sat_fix", ts)
+    assert fixes == [Fix(timestamp_ns=100, lat=45.0, lon=10.0)]

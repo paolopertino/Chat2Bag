@@ -57,3 +57,21 @@ def locate_frames(frames: list[dict], fixes: list["Fix"], max_gap_ns: int) -> in
             frame["lon"] = best[1].lon
             located += 1
     return located
+
+
+def read_fixes(reader, gps_topic: str, typestore) -> list["Fix"]:
+    """Read all valid Fixes from a bag's GPS topic in a single pass.
+
+    Used by a future locate-only backfill; extraction reuses `fix_from_navsatfix`
+    inline in its existing message loop instead of calling this.
+    """
+    gps_conns = [c for c in reader.connections if c.topic == gps_topic]
+    if not gps_conns:
+        return []
+    fixes: list[Fix] = []
+    for connection, timestamp_ns, rawdata in reader.messages(connections=gps_conns):
+        msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
+        fix = fix_from_navsatfix(msg, timestamp_ns)
+        if fix is not None:
+            fixes.append(fix)
+    return fixes
