@@ -27,8 +27,10 @@ export function AreaLayer({ onChange }: AreaLayerProps) {
     });
 
     const handleCreate = (e: { layer: L.Layer; shape: string }) => {
-      // keep only the latest shape (single Area for v1)
-      map.pm.getGeomanLayers().forEach((l) => { if (l !== e.layer) map.removeLayer(l); });
+      // Keep only the latest drawn shape (single Area for v1). Use getGeomanDrawLayers()
+      // — geoman attaches to EVERY vector layer by default, so getGeomanLayers() would
+      // also return (and remove) the BagTrajectories polylines, wiping the track.
+      map.pm.getGeomanDrawLayers().forEach((l) => { if (l !== e.layer) map.removeLayer(l); });
       if (e.shape === "Circle") {
         const c = e.layer as L.Circle;
         const ll = c.getLatLng();
