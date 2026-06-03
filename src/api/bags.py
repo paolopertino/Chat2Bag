@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.state import indexing_status
 from src.auth.dependencies import require_current_user
 from src.core.app_config import get_app_config
+from src.core.index_stamp import gps_is_located, read_gps_stamp
 from src.core.settings import get_settings
 from src.core.storage import resolve_artifact_path
 
@@ -91,12 +92,15 @@ async def scan_bags(
     for candidate in sorted(bag_dirs, key=lambda p: str(p.resolve())):
         lancedb_dir = _artifact_dir_for_bag(candidate) / "lancedb"
         bag_path = str(candidate.resolve())
+        stamp = read_gps_stamp(_metadata_path_for_bag(candidate))
         bags.append(
             {
                 "bag_path": bag_path,
                 "bag_name": candidate.name,
                 "is_indexed": lancedb_dir.exists() and lancedb_dir.is_dir(),
                 "status": indexing_status.get(bag_path, "idle"),
+                "is_located": gps_is_located(stamp),
+                "located_frame_count": int(stamp.get("located_frame_count", 0)) if stamp else 0,
             }
         )
 
@@ -145,12 +149,41 @@ async def bag_info(
         if "timestamp_ns" in frame
     ]
 
+    gps_stamp = metadata.get("gps")
     return {
         "bag_path": str(path),
         "frame_count": len(timestamps),
         "first_timestamp_ns": min(timestamps) if timestamps else None,
         "last_timestamp_ns": max(timestamps) if timestamps else None,
+        "is_located": gps_is_located(gps_stamp),
+        "located_frame_count": int(gps_stamp.get("located_frame_count", 0)) if gps_stamp else 0,
     }
+
+
+@router.get("/track")
+async def bag_track(
+    bag_path: str = Query(..., description="Absolute path of bag directory"),
+    stride: int = Query(1, ge=1, description="Return every Nth located frame"),
+):
+    """The bag's trajectory: located frames as {lat, lon, timestamp_ns}, chronological."""
+    path = Path(bag_path).expanduser().resolve()
+    if not path.exists() or not path.is_dir():
+        raise HTTPException(status_code=404, detail="Bag path does not exist")
+
+    metadata_path = _metadata_path_for_bag(path)
+    if not metadata_path.exists() or not metadata_path.is_file():
+        raise HTTPException(status_code=404, detail="Bag metadata not found. Index the bag first.")
+
+    with metadata_path.open("r", encoding="utf-8") as handle:
+        metadata = json.load(handle)
+
+    located = [
+        {"lat": f["lat"], "lon": f["lon"], "timestamp_ns": f["timestamp_ns"]}
+        for f in metadata.get("frames", [])
+        if "lat" in f and "lon" in f
+    ]
+    located.sort(key=lambda p: p["timestamp_ns"])
+    return {"bag_path": str(path), "points": located[::stride]}
 
 
 @router.get("/frames")
