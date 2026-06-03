@@ -9,7 +9,7 @@ import {
   regionSearchByImage,
   regionSearchByText,
 } from "../api/client";
-import type { HeatmapResponse, Point, SearchResult } from "../api/types";
+import type { Area, HeatmapResponse, Point, SearchResult } from "../api/types";
 
 export type RegionQuery =
   | { kind: "text"; text: string }
@@ -50,7 +50,7 @@ export function useRegionSearch() {
   );
 
   const runText = useCallback(
-    (text: string, bagPaths: string[], topK: number) => {
+    (text: string, bagPaths: string[], topK: number, area?: Area) => {
       if (!text.trim()) {
         toast.error("Enter a region query.");
         return;
@@ -60,14 +60,14 @@ export function useRegionSearch() {
         return;
       }
       void run({ kind: "text", text: text.trim() }, async () =>
-        (await regionSearchByText(text.trim(), bagPaths, topK)).results,
+        (await regionSearchByText(text.trim(), bagPaths, topK, area)).results,
       );
     },
     [run],
   );
 
   const runImage = useCallback(
-    (file: File, objectUrl: string, points: Point[], bagPaths: string[], topK: number) => {
+    (file: File, objectUrl: string, points: Point[], bagPaths: string[], topK: number, area?: Area) => {
       if (points.length === 0) {
         toast.error("Place at least one point on the support image.");
         return;
@@ -77,14 +77,14 @@ export function useRegionSearch() {
         return;
       }
       void run({ kind: "image", file, objectUrl, points }, async () =>
-        (await regionSearchByImage(file, points, bagPaths, topK)).results,
+        (await regionSearchByImage(file, points, bagPaths, topK, area)).results,
       );
     },
     [run],
   );
 
   const runFrame = useCallback(
-    (filePath: string, points: Point[], bagPaths: string[], topK: number) => {
+    (filePath: string, points: Point[], bagPaths: string[], topK: number, area?: Area) => {
       if (points.length === 0) {
         toast.error("Place at least one point on the support frame.");
         return;
@@ -94,10 +94,22 @@ export function useRegionSearch() {
         return;
       }
       void run({ kind: "frame", filePath, points }, async () =>
-        (await regionSearchByFrame(filePath, points, bagPaths, topK)).results,
+        (await regionSearchByFrame(filePath, points, bagPaths, topK, area)).results,
       );
     },
     [run],
+  );
+
+  // Re-issue the active region query with a (possibly changed) Area. Mirrors the
+  // global path, whose URL effect re-runs the search when the Area changes.
+  const rerunWithArea = useCallback(
+    (bagPaths: string[], topK: number, area?: Area) => {
+      if (!query) return;
+      if (query.kind === "text") runText(query.text, bagPaths, topK, area);
+      else if (query.kind === "frame") runFrame(query.filePath, query.points, bagPaths, topK, area);
+      else runImage(query.file, query.objectUrl, query.points, bagPaths, topK, area);
+    },
+    [query, runText, runFrame, runImage],
   );
 
   const fetchHeatmap = useCallback(
@@ -124,6 +136,7 @@ export function useRegionSearch() {
     runText,
     runImage,
     runFrame,
+    rerunWithArea,
     clear,
     fetchHeatmap,
   };

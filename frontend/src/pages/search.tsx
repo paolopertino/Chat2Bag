@@ -63,6 +63,20 @@ export function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, search.q, search.similar]);
 
+  // Region search is imperative (not URL-driven), so changing the Area while a region
+  // query is active won't re-fetch on its own. Re-run it here so the Area composes with
+  // Region the same way it does with Global. Guarded to fire only on actual Area change.
+  const areaParam = searchParams.get("area");
+  const prevAreaParamRef = useRef(areaParam);
+  useEffect(() => {
+    if (prevAreaParamRef.current === areaParam) return;
+    prevAreaParamRef.current = areaParam;
+    if (mode === "region" && region.query) {
+      region.rerunWithArea(search.bagPaths, search.topK, area ?? undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaParam]);
+
   // One-shot handoff from the Bag Explorer: /search?mode=region&support=<frame path>
   // seeds the point-canvas dialog with that frame, then strips the param.
   const seededSupportRef = useRef<string | null>(null);
@@ -141,9 +155,9 @@ export function SearchPage() {
     setDialogOpen(false);
     if (!editingSupport) return;
     if (editingSupport.kind === "image") {
-      region.runImage(editingSupport.file, editingSupport.objectUrl, points, search.bagPaths, search.topK);
+      region.runImage(editingSupport.file, editingSupport.objectUrl, points, search.bagPaths, search.topK, area ?? undefined);
     } else {
-      region.runFrame(editingSupport.filePath, points, search.bagPaths, search.topK);
+      region.runFrame(editingSupport.filePath, points, search.bagPaths, search.topK, area ?? undefined);
     }
   };
 
@@ -210,7 +224,7 @@ export function SearchPage() {
                   toast.error("Index at least one bag to search.");
                   return;
                 }
-                region.runText(text, search.bagPaths, search.topK);
+                region.runText(text, search.bagPaths, search.topK, area ?? undefined);
               }}
               onClear={() => setRegionDraft("")}
               onImageUpload={handleRegionUpload}
@@ -279,7 +293,7 @@ export function SearchPage() {
         <RegionEmptyState
           onPick={(text) => {
             setRegionDraft(text);
-            region.runText(text, search.bagPaths, search.topK);
+            region.runText(text, search.bagPaths, search.topK, area ?? undefined);
           }}
         />
       ) : region.isSearching ? (
