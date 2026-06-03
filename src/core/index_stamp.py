@@ -68,6 +68,36 @@ def write_region_stamp(
         json.dump(meta, handle, indent=4)
 
 
+def build_gps_stamp(
+    *, topic: str, max_gap_sec: float, fix_count: int,
+    located_frame_count: int, frame_count: int,
+) -> dict:
+    """The top-level `gps` stamp recorded in metadata.json (Map search)."""
+    return {
+        "topic": topic,
+        "max_gap_sec": float(max_gap_sec),
+        "fix_count": int(fix_count),
+        "located_frame_count": int(located_frame_count),
+        "frame_count": int(frame_count),
+    }
+
+
+def read_gps_stamp(metadata_path) -> dict | None:
+    """Return the `gps` stamp from a metadata.json, or None if absent/unreadable."""
+    try:
+        with Path(metadata_path).open("r", encoding="utf-8") as handle:
+            meta = json.load(handle)
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+    stamp = meta.get("gps")
+    return stamp if isinstance(stamp, dict) else None
+
+
+def gps_is_located(stamp: dict | None) -> bool:
+    """True iff a bag has a GPS stamp with at least one located Frame."""
+    return bool(stamp) and int(stamp.get("located_frame_count", 0)) > 0
+
+
 def is_region_stamp_compatible(
     stamp: dict | None, name: str, dim: int, feature: str, encode_long_side: int
 ) -> bool:
