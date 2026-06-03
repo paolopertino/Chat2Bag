@@ -201,7 +201,7 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
 
   // Client-side score filter
   const filteredResults = useMemo(
-    () => search.results.filter((r) => r.similarity_score >= minScore),
+    () => search.results.filter((r) => (r.similarity_score ?? 1) >= minScore),
     [search.results, minScore],
   );
 

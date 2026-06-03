@@ -55,7 +55,9 @@ export function ImageCard({ result, href, onClick, onSimilarSearch, onUseAsRegio
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <p className="truncate text-sm font-semibold">{result.source_bag}</p>
-            <p className="font-mono text-xs text-[var(--ink-soft)]">score {(result.similarity_score * 100).toFixed(2)}%</p>
+            {result.similarity_score != null && (
+              <p className="font-mono text-xs text-[var(--ink-soft)]">score {(result.similarity_score * 100).toFixed(2)}%</p>
+            )}
             <p className="font-mono text-xs text-[var(--ink-soft)]">t = {formatTimestampNs(result.timestamp_ns)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">

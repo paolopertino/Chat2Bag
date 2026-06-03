@@ -74,7 +74,7 @@ export function RegionResultLightbox({
         <div className="min-w-0 text-sm">
           <span className="font-semibold">{result.source_bag}</span>
           <span className="ml-2 font-mono text-xs text-white/70">
-            {(result.similarity_score * 100).toFixed(2)}% · {result.topic}
+            {result.similarity_score != null ? `${(result.similarity_score * 100).toFixed(2)}% · ` : ""}{result.topic}
           </span>
         </div>
         <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-white/10">

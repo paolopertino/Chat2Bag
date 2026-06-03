@@ -137,7 +137,7 @@ export function SearchPage() {
   };
 
   const openLightbox = (result: SearchResult) => {
-    const filtered = region.results.filter((r) => r.similarity_score >= search.minScore);
+    const filtered = region.results.filter((r) => (r.similarity_score ?? 1) >= search.minScore);
     const i = filtered.findIndex(
       (r) => r.file_path === result.file_path && r.timestamp_ns === result.timestamp_ns,
     );
@@ -160,7 +160,7 @@ export function SearchPage() {
     );
   }
 
-  const regionResults = region.results.filter((r) => r.similarity_score >= search.minScore);
+  const regionResults = region.results.filter((r) => (r.similarity_score ?? 1) >= search.minScore);
   const hasGlobalQuery = search.q !== "" || search.similar !== "";
   const hasRegionQuery = region.query !== null;
   const hidden = search.rawResultCount - search.results.length;
