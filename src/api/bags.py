@@ -12,6 +12,7 @@ from src.core.app_config import get_app_config
 from src.core.index_stamp import gps_is_located, read_gps_stamp
 from src.core.settings import get_settings
 from src.core.storage import resolve_artifact_path
+from src.services.sample_service import FocusFrameNotFound, build_samples_response
 
 router = APIRouter(
     prefix="/api/bags",
@@ -221,3 +222,45 @@ async def bag_frames(
     frames.sort(key=lambda frame: frame["timestamp_ns"])
 
     return {"bag_path": str(path), "frames": frames}
+
+
+@router.get("/samples")
+async def bag_samples(
+    bag_path: str = Query(..., description="Absolute path of bag directory"),
+    start_ns: int = Query(..., ge=0, description="Start timestamp in nanoseconds"),
+    duration_sec: float = Query(
+        10.0, ge=0.1, le=300.0, description="Window size in seconds"
+    ),
+    focus_file_path: str | None = Query(
+        None,
+        description="Absolute or artifact-relative frame path to force as the focused Sample Frame",
+    ),
+):
+    path = Path(bag_path).expanduser().resolve()
+    if not path.exists() or not path.is_dir():
+        raise HTTPException(status_code=404, detail="Bag path does not exist")
+
+    artifact_dir = _artifact_dir_for_bag(path)
+    metadata_path = artifact_dir / "metadata.json"
+    if not metadata_path.exists() or not metadata_path.is_file():
+        raise HTTPException(
+            status_code=404, detail="Bag metadata not found. Index the bag first."
+        )
+
+    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
+        metadata = json.load(metadata_handle)
+
+    try:
+        return build_samples_response(
+            bag_path=path,
+            artifact_dir=artifact_dir,
+            metadata=metadata,
+            start_ns=start_ns,
+            duration_sec=duration_sec,
+            sampling_fps=get_app_config().ingestion.sampling_fps,
+            focus_file_path=focus_file_path,
+        )
+    except FocusFrameNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
