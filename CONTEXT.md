@@ -33,6 +33,26 @@ carrying its own embedding. The atomic unit **Region search** indexes and
 matches — parallel to how a whole Frame is the atomic unit of Global search.
 _Avoid_: token (the model-internal name), cell, tile.
 
+### Geography
+
+**Fix**:
+A single GPS reading from the vehicle's satellite-navigation topic — a
+(latitude, longitude) at one timestamp, sampled at its own (typically faster)
+rate, independent of camera sampling. The raw geographic datum.
+_Avoid_: GPS point, position (overloaded), coordinate.
+
+**Track**:
+The ordered sequence of Fixes for one Bag — the path the vehicle drove.
+A display-and-derivation substrate, not a searchable unit itself.
+_Avoid_: trajectory, route, path.
+
+**Frame location**:
+The (latitude, longitude) attributed to a Frame by joining the Track to the
+Frame's timestamp (nearest Fix within a tolerance) — the same nearest-timestamp
+resolution a Sample uses across cameras. A Frame whose timestamp has no nearby
+valid Fix has *no* Frame location and is invisible to Map search.
+_Avoid_: geotag, GPS coordinate of the frame.
+
 ### Search modes
 
 **Support image**:
@@ -55,6 +75,24 @@ entities into the whole-frame embedding.
 _Avoid_: dense search, patch search, entity search (pick one — "Region search"
 is canonical).
 
+**Area**:
+A geographic shape the user draws on a map — a circle (a clicked point plus a
+radius) or a polygon — expressing *where in the world* to look. The spatial
+counterpart of a Support image: it carries no content, only extent.
+**Region lives in image space (pixels inside a Frame); Area lives in world
+space (coordinates on the map).** Keep them apart.
+_Avoid_: region (means the patch concept), bounds (implies rectangle only),
+geofence (implies a persistent enter/exit trigger).
+
+**Map search**:
+Constraining results to Frames whose **Frame location** falls inside an **Area**.
+It is a *filter*, not a ranker: in/out is boolean, so on its own it browses
+(every located Frame in the Area, time/distance ordered), and combined with a
+text/image/Region query it narrows that query to the Area while the query still
+ranks. The user's mental model is "look only here." Defined through a
+full-screen map (click a point, or draw an Area).
+_Avoid_: geo search, location search, area search (collides with Region).
+
 ## Relationships
 
 - A **Bag** carries several **Cameras**; each **Camera** yields many **Frames**
@@ -66,6 +104,12 @@ is canonical).
   evidence: whole-frame match vs. a single region match.
 - A **Support image** drives **Global search** (whole image) or **Region search**
   (points on it); it may be an indexed **Frame** or an external upload.
+- A **Bag** carries one **Track** (its GPS path); the Track gives each **Frame**
+  a **Frame location** by nearest-timestamp join (a Bag with no GPS topic has no
+  Track, so none of its Frames are Map-searchable).
+- An **Area** filters **Frames** by **Frame location**; **Map search** composes
+  with **Global** or **Region search** (filter ∩ ranked query) or stands alone
+  as a geographic browse.
 
 ## Flagged ambiguities
 
