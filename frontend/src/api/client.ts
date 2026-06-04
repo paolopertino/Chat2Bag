@@ -13,6 +13,7 @@ import type {
   Point,
   ScanBagsResponse,
   SearchResponse,
+  SamplesResponse,
   TrackResponse,
 } from "./types";
 
@@ -222,6 +223,21 @@ export async function getFrames(
     duration_sec: String(durationSec),
   });
   return http<FramesResponse>(`/api/bags/frames?${params.toString()}`);
+}
+
+export async function getSamples(
+  bagPath: string,
+  startNs: number,
+  durationSec: number,
+  focusFilePath?: string,
+): Promise<SamplesResponse> {
+  const params = new URLSearchParams({
+    bag_path: bagPath,
+    start_ns: String(startNs),
+    duration_sec: String(durationSec),
+  });
+  if (focusFilePath) params.set("focus_file_path", focusFilePath);
+  return http<SamplesResponse>(`/api/bags/samples?${params.toString()}`);
 }
 
 export async function getTrack(bagPath: string, stride = 1): Promise<TrackResponse> {

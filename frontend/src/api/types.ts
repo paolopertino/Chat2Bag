@@ -74,6 +74,28 @@ export interface FramesResponse {
   frames: FrameInfo[];
 }
 
+export interface SampleFrameInfo {
+  timestamp_ns: number;
+  topic: string;
+  file_path: string;
+  delta_ns: number;
+  is_focus?: boolean;
+}
+
+export interface SampleInfo {
+  timestamp_ns: number;
+  anchor_frame: SampleFrameInfo | null;
+  frames_by_camera: Record<string, SampleFrameInfo>;
+}
+
+export interface SamplesResponse {
+  bag_path: string;
+  cameras: string[];
+  anchor_camera: string | null;
+  sample_tolerance_ns: number;
+  samples: SampleInfo[];
+}
+
 export interface ChatResponse {
   response: string;
 }
