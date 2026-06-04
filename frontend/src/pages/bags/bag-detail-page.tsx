@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { getBagInfo, getBagStatus } from "../../api/client";
 import type { BagInfo, BagInfoResponse } from "../../api/types";
 import { BagRootChip } from "../../components/bags/bag-root-chip";
-import { BagSequenceViewer } from "../../components/bags/bag-sequence-viewer";
+import { BagSampleBrowser } from "../../components/bags/bag-sample-browser";
 import { BagTree } from "../../components/bags/bag-tree";
 import { PinRail } from "../../components/bags/pin-rail";
 import { ExtractDatasetDialog } from "../../components/extraction/extract-dataset-dialog";
@@ -18,7 +18,7 @@ import { Button } from "../../components/ui/button";
 import { useJobs } from "../../context/jobs-context";
 import { useExtractionLauncher } from "../../hooks/use-extraction-launcher";
 import { usePins } from "../../hooks/use-pins";
-import { useSequenceViewer } from "../../hooks/use-sequence-viewer";
+import { useSampleBrowser } from "../../hooks/use-sample-browser";
 import { useUrlSearch } from "../../hooks/use-url-search";
 import { decodeBagId } from "../../lib/bag-id";
 import type { BagsOutletContext } from "./bags-layout";
@@ -64,7 +64,7 @@ export function BagDetailPage() {
   const syntheticBagPathRef = useRef<string | null>(null);
   const viewerOpenedRef = useRef<string | null>(null);
 
-  const viewerState = useSequenceViewer();
+  const viewerState = useSampleBrowser();
   const launcher = useExtractionLauncher(schema, refresh);
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -82,13 +82,22 @@ export function BagDetailPage() {
 
   const pins = usePins(bagPath, search.results, search.minScore);
 
-  const highlightedTimestamps = useMemo(() => {
-    const map = new Map<number, number>();
+  const highlightedSampleTimestamps = useMemo(() => {
+    const byPinTimestamp = new Map<number, number>();
     for (const p of pins) {
-      if (p.score !== undefined) map.set(p.timestamp_ns, p.score);
+      if (p.score !== undefined) byPinTimestamp.set(p.timestamp_ns, p.score);
     }
-    return map;
-  }, [pins]);
+    const out = new Map<number, number>();
+    for (const sample of viewerState.samples) {
+      for (const frame of Object.values(sample.frames_by_camera)) {
+        const score = byPinTimestamp.get(frame.timestamp_ns);
+        if (score !== undefined) {
+          out.set(sample.timestamp_ns, Math.max(out.get(sample.timestamp_ns) ?? 0, score));
+        }
+      }
+    }
+    return out;
+  }, [pins, viewerState.samples]);
 
   const [viewportRange, setViewportRange] = useState<{ start: number | null; end: number | null }>({
     start: null,
@@ -199,7 +208,7 @@ export function BagDetailPage() {
     if (viewerOpenedRef.current === viewerOpenKey) return;
 
     viewerOpenedRef.current = viewerOpenKey;
-    void viewerState.openViewerForBag({
+    void viewerState.openForBag({
       bagPath,
       bagName: resolvedBag.bag_name,
       startNs,
@@ -340,6 +349,12 @@ export function BagDetailPage() {
     );
   }
 
+  const activeSupportFrame = viewerState.activeSample
+    ? Object.values(viewerState.activeSample.frames_by_camera).find((frame) => frame.is_focus)
+      ?? viewerState.activeSample.anchor_frame
+      ?? Object.values(viewerState.activeSample.frames_by_camera)[0]
+    : null;
+
   const headerSlot = (
     <div className="flex items-center gap-2 border-b border-[var(--line)] px-3 py-2">
       <div className="flex flex-shrink-0 items-center gap-2">
@@ -373,14 +388,14 @@ export function BagDetailPage() {
         />
       </div>
       <div className="flex flex-shrink-0 items-center gap-2">
-        {viewerState.activeFrame?.file_path ? (
+        {activeSupportFrame?.file_path ? (
           <Button
             variant="outline"
             size="sm"
             title="Use this frame as a region-search support image"
             onClick={() =>
               navigate(
-                `/search?mode=region&support=${encodeURIComponent(viewerState.activeFrame!.file_path)}`,
+                `/search?mode=region&support=${encodeURIComponent(activeSupportFrame.file_path)}`,
               )
             }
           >
@@ -452,13 +467,14 @@ export function BagDetailPage() {
 
   return (
     <>
-      <BagSequenceViewer
+      <BagSampleBrowser
         result={viewerState.selectedResult}
-        activeFrame={viewerState.activeFrame}
-        frames={viewerState.frames}
+        activeSample={viewerState.activeSample}
+        samples={viewerState.samples}
+        cameras={viewerState.cameras}
         selectedTimestampNs={viewerState.selectedTimestampNs}
-        selectedFrameIndex={viewerState.selectedFrameIndex}
-        isLoadingFrames={viewerState.isLoadingFrames}
+        selectedSampleIndex={viewerState.selectedSampleIndex}
+        isLoadingSamples={viewerState.isLoadingSamples}
         canLoadMoreLeft={viewerState.canLoadMoreLeft}
         canLoadMoreRight={viewerState.canLoadMoreRight}
         isExtendingLeft={viewerState.isExtendingLeft}
@@ -467,22 +483,20 @@ export function BagDetailPage() {
         chatQuery={viewerState.chatQuery}
         chatResponse={viewerState.chatResponse}
         isChatting={viewerState.isChatting}
-        extractionEnabled={extractionEnabled}
         vlmWindowStartNs={viewerState.vlmWindowStartNs}
         vlmWindowEndNs={viewerState.vlmWindowEndNs}
-        isFrameInVlmWindow={viewerState.isFrameInVlmWindow}
+        isSampleInVlmWindow={viewerState.isSampleInVlmWindow}
         onSelectTimestamp={viewerState.setSelectedTimestampNs}
-        onSelectNextFrame={viewerState.selectNextFrame}
-        onSelectPreviousFrame={viewerState.selectPreviousFrame}
+        onSelectNextSample={() => void viewerState.selectNextSample()}
+        onSelectPreviousSample={() => void viewerState.selectPreviousSample()}
         onLoadMoreLeft={() => void viewerState.loadMoreLeft()}
         onLoadMoreRight={() => void viewerState.loadMoreRight()}
         onChatQueryChange={viewerState.setChatQuery}
         onChatDurationChange={viewerState.setChatDuration}
         onChat={() => void viewerState.runChat()}
-        onExtractDataset={handleExtractDataset}
         headerSlot={headerSlot}
         pinRail={pinRail}
-        highlightedTimestamps={highlightedTimestamps}
+        highlightedSampleTimestamps={highlightedSampleTimestamps}
         onViewportChange={handleViewportChange}
         chatOpen={chatOpen}
         onChatOpenChange={setChatOpen}
