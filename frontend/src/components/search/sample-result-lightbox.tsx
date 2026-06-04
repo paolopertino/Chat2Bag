@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Crosshair, ExternalLink, Flame, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getSamples } from "../../api/client";
@@ -68,6 +68,16 @@ export function SampleResultLightbox({
   const [opacity, setOpacity] = useState(0.6);
   const [heatmaps, setHeatmaps] = useState<Record<string, HeatmapResponse | undefined>>({});
   const [heatmapLoading, setHeatmapLoading] = useState<Record<string, boolean | undefined>>({});
+  const heatmapsRef = useRef(heatmaps);
+  const heatmapLoadingRef = useRef(heatmapLoading);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!result) return;
@@ -121,36 +131,41 @@ export function SampleResultLightbox({
 
   useEffect(() => {
     if (!showHeatmaps || !fetchHeatmap || visibleFilePaths.length === 0) return;
-    const missing = visibleFilePaths.filter((filePath) => !heatmaps[filePath] && !heatmapLoading[filePath]);
+    const missing = visibleFilePaths.filter(
+      (filePath) => !heatmapsRef.current[filePath] && !heatmapLoadingRef.current[filePath],
+    );
     if (missing.length === 0) return;
 
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHeatmapLoading((previous) => {
       const next = { ...previous };
       for (const filePath of missing) next[filePath] = true;
+      heatmapLoadingRef.current = next;
       return next;
     });
 
     for (const filePath of missing) {
       fetchHeatmap(filePath)
         .then((heatmap) => {
-          if (!cancelled && heatmap) {
-            setHeatmaps((previous) => ({ ...previous, [filePath]: heatmap }));
+          if (mountedRef.current && heatmap) {
+            setHeatmaps((previous) => {
+              const next = { ...previous, [filePath]: heatmap };
+              heatmapsRef.current = next;
+              return next;
+            });
           }
         })
         .catch(() => null)
         .finally(() => {
-          if (!cancelled) {
-            setHeatmapLoading((previous) => ({ ...previous, [filePath]: false }));
+          if (mountedRef.current) {
+            setHeatmapLoading((previous) => {
+              const next = { ...previous, [filePath]: false };
+              heatmapLoadingRef.current = next;
+              return next;
+            });
           }
         });
     }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchHeatmap, heatmapLoading, heatmaps, showHeatmaps, visibleFilePaths]);
+  }, [fetchHeatmap, showHeatmaps, visibleFilePaths]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
