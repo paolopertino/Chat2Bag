@@ -229,7 +229,7 @@ async def bag_samples(
     bag_path: str = Query(..., description="Absolute path of bag directory"),
     start_ns: int = Query(..., ge=0, description="Start timestamp in nanoseconds"),
     duration_sec: float = Query(
-        10.0, ge=0.1, le=300.0, description="Window size in seconds"
+        ..., ge=0.1, le=300.0, description="Window size in seconds"
     ),
     focus_file_path: str | None = Query(
         None,

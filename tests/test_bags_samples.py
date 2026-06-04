@@ -234,3 +234,25 @@ def test_samples_focus_path_not_found_returns_404(tmp_path, bypass_auth):
 
     assert resp.status_code == 404
     assert "focus_file_path" in resp.json()["detail"]
+
+
+def test_samples_requires_duration_sec(tmp_path, bypass_auth):
+    metadata = {
+        "schema_version": 5,
+        "cameras": ["/cam/front"],
+        "frames": [
+            {
+                "timestamp_ns": 1,
+                "topic": "/cam/front",
+                "file_path": "thumbnails/front/frame_1.jpg",
+            },
+        ],
+    }
+    bag, _artifact = _write_bag(tmp_path, metadata)
+
+    resp = _client(bypass_auth).get(
+        "/api/bags/samples",
+        params={"bag_path": str(bag), "start_ns": 0},
+    )
+
+    assert resp.status_code == 422
