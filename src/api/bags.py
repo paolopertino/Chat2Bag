@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 
 from pathlib import Path
 from typing import Any, Dict, List
@@ -185,6 +186,39 @@ async def bag_track(
     ]
     located.sort(key=lambda p: p["timestamp_ns"])
     return {"bag_path": str(path), "points": located[::stride]}
+
+
+@router.get("/tracks")
+async def bag_tracks(
+    bag_paths: list[str] = Query(..., description="Bag directories to load Tracks for"),
+    max_points: int = Query(500, ge=2, le=5000, description="Max points returned per Track"),
+):
+    """All requested bags' Tracks in one call, decimated for map rendering.
+
+    Bags with no metadata or no located frames are silently omitted (a Bag
+    without a Track is simply not drawable) — never a 404.
+    """
+    tracks = []
+    for raw in bag_paths:
+        path = Path(raw).expanduser().resolve()
+        metadata_path = _metadata_path_for_bag(path)
+        if not metadata_path.exists() or not metadata_path.is_file():
+            continue
+        with metadata_path.open("r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        located = [
+            {"lat": f["lat"], "lon": f["lon"], "timestamp_ns": f["timestamp_ns"]}
+            for f in metadata.get("frames", [])
+            if "lat" in f and "lon" in f
+        ]
+        if not located:
+            continue
+        located.sort(key=lambda p: p["timestamp_ns"])
+        stride = max(1, math.ceil(len(located) / max_points))
+        tracks.append(
+            {"bag_path": str(path), "bag_name": path.name, "points": located[::stride]}
+        )
+    return {"tracks": tracks}
 
 
 @router.get("/frames")
