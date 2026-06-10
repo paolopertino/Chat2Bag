@@ -5,6 +5,7 @@ import { MainLayout } from "./components/layout/main-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
 import { LoginPage } from "./pages/login";
 import { MapHomePage } from "./pages/map-home";
+import { BagViewerPage } from "./pages/bag-viewer";
 import { BagDetailPage } from "./pages/bags/bag-detail-page";
 import { BagsLayout } from "./pages/bags/bags-layout";
 import { BagsListPage } from "./pages/bags/bags-list-page";
@@ -21,7 +22,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <FullBleedLayout />,
-        children: [{ index: true, element: <MapHomePage /> }],
+        children: [
+          { index: true, element: <MapHomePage /> },
+          { path: "bags/:bagId", element: <BagViewerPage /> },
+        ],
       },
       {
         element: <MainLayout />,
@@ -33,7 +37,7 @@ export const router = createBrowserRouter([
             element: <BagsLayout />,
             children: [
               { index: true, element: <BagsListPage /> },
-              { path: ":bagId", element: <BagDetailPage /> },
+              { path: ":bagId/detail", element: <BagDetailPage /> },
             ],
           },
           { path: "*", element: <Navigate to="/" replace /> },
