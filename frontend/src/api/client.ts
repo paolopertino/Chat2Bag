@@ -8,6 +8,7 @@ import type {
   ExtractionLogsResponse,
   ExtractionSubmitRequest,
   ExtractionSubmitResponse,
+  FleetTracksResponse,
   FramesResponse,
   HeatmapResponse,
   Point,
@@ -243,6 +244,13 @@ export async function getSamples(
 export async function getTrack(bagPath: string, stride = 1): Promise<TrackResponse> {
   const params = new URLSearchParams({ bag_path: bagPath, stride: String(stride) });
   return http<TrackResponse>(`/api/bags/track?${params.toString()}`);
+}
+
+export function fetchFleetTracks(bagPaths: string[], maxPoints = 500): Promise<FleetTracksResponse> {
+  const params = new URLSearchParams();
+  for (const p of bagPaths) params.append("bag_paths", p);
+  params.set("max_points", String(maxPoints));
+  return http<FleetTracksResponse>(`/api/bags/tracks?${params}`);
 }
 
 export async function searchMap(
