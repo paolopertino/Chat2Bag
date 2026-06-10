@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { OmniboxSearch, SupportSource } from "../../hooks/use-omnibox-search";
 import { BagPickerChip } from "../search/bag-picker-chip";
 import { FilterChip } from "../search/filter-chip";
-import { RegionSupportDialog } from "../search/region-support-dialog";
+import { RegionSupportDialog, type RegionSupport } from "../search/region-support-dialog";
 import { SearchInput } from "../search/search-input";
 
 interface OmniboxProps {
@@ -27,7 +27,7 @@ export function Omnibox({
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
   // Convert SupportSource to the RegionSupportDialog's RegionSupport format
-  function toRegionSupport(s: SupportSource | null): { kind: "image"; file: File; objectUrl: string } | { kind: "frame"; filePath: string } | null {
+  function toRegionSupport(s: SupportSource | null): RegionSupport | null {
     if (!s) return null;
     if (s.kind === "upload") return { kind: "image", file: s.file, objectUrl: s.objectUrl };
     return { kind: "frame", filePath: s.filePath };
@@ -46,6 +46,7 @@ export function Omnibox({
             }
             onChange={search.setText}
             onSubmit={() => search.submit()}
+            canSubmit={Boolean(search.text.trim() || search.support || search.area)}
             onClear={() => search.clear()}
             onImageUpload={(file) => {
               search.setSupport({ kind: "upload", file, objectUrl: URL.createObjectURL(file) });
@@ -118,7 +119,7 @@ export function Omnibox({
         <FilterChip
           topK={search.topK}
           minScore={search.minScore}
-          rawResultCount={search.results.length}
+          rawResultCount={search.rawResultCount}
           bagCount={search.bagPaths.length}
           onTopKChange={search.setTopK}
           onMinScoreChange={search.setMinScore}
@@ -132,9 +133,8 @@ export function Omnibox({
           initialPoints={search.points}
           onClose={() => setSupportDialogOpen(false)}
           onConfirm={(points) => {
-            search.setPoints(points);
             setSupportDialogOpen(false);
-            if (points.length > 0) search.submit();
+            search.submitSupportRegion(points);
           }}
         />
       ) : null}

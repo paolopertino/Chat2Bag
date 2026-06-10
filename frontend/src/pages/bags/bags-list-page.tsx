@@ -1,5 +1,5 @@
 import { LoaderCircle, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { BagTree } from "../../components/bags/bag-tree";
@@ -18,10 +18,9 @@ export function BagsListPage() {
     onIndex,
   } = useOutletContext<BagsOutletContext>();
 
-  const [draft, setDraft] = useState(rootDir);
-
-  // Sync draft when rootDir is updated externally (e.g., localStorage prefill).
-  useEffect(() => setDraft(rootDir), [rootDir]);
+  const [draftState, setDraftState] = useState(() => ({ rootDir, value: rootDir }));
+  const draft = draftState.rootDir === rootDir ? draftState.value : rootDir;
+  const setDraft = (value: string) => setDraftState({ rootDir, value });
 
   const submit = () => {
     const trimmed = draft.trim();

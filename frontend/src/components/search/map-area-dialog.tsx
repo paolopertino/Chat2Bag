@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -21,8 +21,13 @@ interface MapAreaDialogProps {
 }
 
 export function MapAreaDialog({ open, initialArea, tracks, onClose, onConfirm }: MapAreaDialogProps) {
-  const [draft, setDraft] = useState<Area | null>(initialArea);
-  useEffect(() => { setDraft(initialArea); }, [initialArea, open]);
+  const draftSourceKey = `${open}:${JSON.stringify(initialArea)}`;
+  const [draftState, setDraftState] = useState(() => ({
+    sourceKey: draftSourceKey,
+    value: initialArea,
+  }));
+  const draft = draftState.sourceKey === draftSourceKey ? draftState.value : initialArea;
+  const setDraft = (value: Area | null) => setDraftState({ sourceKey: draftSourceKey, value });
 
   const count = draft ? countInArea(draft, tracks) : null;
   const center = tracks[0]?.[0] ? [tracks[0][0].lat, tracks[0][0].lon] as [number, number] : DEFAULT_CENTER;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Area, Point, SearchResult } from "../api/types";
 import { useMapArea } from "./use-map-area";
@@ -29,29 +29,58 @@ export interface OmniboxSearch {
   setMinScore: (s: number) => void;
   results: SearchResult[];
   isSearching: boolean;
+  rawResultCount: number;
   activeKind: "none" | "global" | "region" | "browse";
   submit: () => void;
+  submitSupportRegion: (points: Point[]) => void;
   loadMore: () => void;
   clear: () => void;
   fetchHeatmap: ReturnType<typeof useRegionSearch>["fetchHeatmap"];
+}
+
+function revokeSupportObjectUrl(support: SupportSource | null): void {
+  if (support?.kind === "upload") URL.revokeObjectURL(support.objectUrl);
 }
 
 export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): OmniboxSearch {
   const url = useUrlSearch({ scope: options?.scope, topKDefault: 100 });
   const region = useRegionSearch();
   const { area, setArea } = useMapArea();
-  const [text, setText] = useState(url.q);
+  const [textDraft, setTextDraft] = useState(() => ({ sourceQ: url.q, value: url.q }));
   const [regionMode, setRegionMode] = useState(false);
-
-  // Sync text when the URL `q` param changes externally (back/forward navigation).
-  useEffect(() => {
-    setText(url.q);
-  }, [url.q]);
   const [support, setSupportState] = useState<SupportSource | null>(null);
+  const supportRef = useRef<SupportSource | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
+  const text = textDraft.sourceQ === url.q ? textDraft.value : url.q;
+  const setText = useCallback(
+    (next: string) => setTextDraft({ sourceQ: url.q, value: next }),
+    [url.q],
+  );
+
+  const setSupport = useCallback((next: SupportSource | null, nextPoints: Point[] = []) => {
+    const previous = supportRef.current;
+    if (
+      previous?.kind === "upload" &&
+      (next?.kind !== "upload" || next.objectUrl !== previous.objectUrl)
+    ) {
+      URL.revokeObjectURL(previous.objectUrl);
+    }
+    supportRef.current = next;
+    setSupportState(next);
+    setPoints(nextPoints);
+  }, []);
+
+  useEffect(
+    () => () => {
+      revokeSupportObjectUrl(supportRef.current);
+      supportRef.current = null;
+    },
+    [],
+  );
 
   const regionActive = region.query !== null;
   const results = regionActive ? region.results : url.results;
+  const rawResultCount = regionActive ? region.results.length : url.rawResultCount;
   const activeKind: OmniboxSearch["activeKind"] = regionActive
     ? "region"
     : url.results.length > 0 || url.isSearching
@@ -62,14 +91,21 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
           : "none"
       : "none";
 
-  function runRegion(topK: number) {
-    if (support?.kind === "upload" && points.length > 0) {
-      region.runImage(support.file, support.objectUrl, points, url.bagPaths, topK, area ?? undefined);
-    } else if (support?.kind === "frame" && points.length > 0) {
-      region.runFrame(support.filePath, points, url.bagPaths, topK, area ?? undefined);
+  function runRegion(topK: number, regionPoints = points) {
+    if (support?.kind === "upload" && regionPoints.length > 0) {
+      region.runImage(support.file, support.objectUrl, regionPoints, url.bagPaths, topK, area ?? undefined);
+    } else if (support?.kind === "frame" && regionPoints.length > 0) {
+      region.runFrame(support.filePath, regionPoints, url.bagPaths, topK, area ?? undefined);
     } else if (regionMode && text.trim()) {
       region.runText(text.trim(), url.bagPaths, topK, area ?? undefined);
     }
+  }
+
+  function submitSupportRegion(nextPoints: Point[]) {
+    setPoints(nextPoints);
+    if (!support || nextPoints.length === 0) return;
+    url.clear();
+    runRegion(url.topK, nextPoints);
   }
 
   function submit() {
@@ -107,8 +143,7 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
 
   function clear() {
     setText("");
-    setSupportState(null);
-    setPoints([]);
+    setSupport(null);
     setRegionMode(false);
     region.clear();
     url.clear();
@@ -121,10 +156,7 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     setRegionMode,
     support,
     points,
-    setSupport: (s, p) => {
-      setSupportState(s);
-      setPoints(p ?? []);
-    },
+    setSupport,
     setPoints,
     area,
     setArea,
@@ -137,8 +169,10 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     setMinScore: url.setMinScore,
     results,
     isSearching: url.isSearching || region.isSearching,
+    rawResultCount,
     activeKind,
     submit,
+    submitSupportRegion,
     loadMore,
     clear,
     fetchHeatmap: region.fetchHeatmap,

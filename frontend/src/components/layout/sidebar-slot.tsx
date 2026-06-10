@@ -23,12 +23,14 @@ export function SidebarSlotProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSidebarSlotContent(): ReactNode | null {
   const ctx = useContext(SidebarSlotContext);
   if (!ctx) throw new Error("useSidebarSlotContent must be inside <SidebarSlotProvider>");
   return ctx.content;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSidebar(
   render: () => ReactNode,
   deps: DependencyList,

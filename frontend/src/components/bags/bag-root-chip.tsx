@@ -26,11 +26,6 @@ export function BagRootChip({
   const [draft, setDraft] = useState(rootDir);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep draft in sync if rootDir is updated externally while we're not editing.
-  useEffect(() => {
-    if (!editing) setDraft(rootDir);
-  }, [rootDir, editing]);
-
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
@@ -95,7 +90,10 @@ export function BagRootChip({
       <Button
         size="sm"
         variant="ghost"
-        onClick={() => setEditing(true)}
+        onClick={() => {
+          setDraft(rootDir);
+          setEditing(true);
+        }}
         className="h-6 w-6 p-0"
         aria-label="Change root directory"
       >

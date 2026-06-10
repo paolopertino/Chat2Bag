@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { BagInfo, BagStatus } from "../../api/types";
@@ -115,11 +115,9 @@ function FolderRow({
   defaultOpen: boolean;
   args: RenderArgs;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [userOpen, setUserOpen] = useState(defaultOpen);
   // Keep folder open if a descendant is selected.
-  useEffect(() => {
-    if (args.selectedAncestors.has(node.fullPath)) setOpen(true);
-  }, [args.selectedAncestors, node.fullPath]);
+  const open = userOpen || args.selectedAncestors.has(node.fullPath);
 
   const Chevron = open ? ChevronDown : ChevronRight;
   const textClass = args.compact ? "text-xs" : "text-sm";
@@ -129,7 +127,7 @@ function FolderRow({
     <li>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setUserOpen((v) => !v)}
         className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-[var(--surface)] ${textClass} text-[var(--ink-soft)]`}
         style={{ paddingLeft: indent }}
       >
