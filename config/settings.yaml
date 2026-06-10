@@ -1,11 +1,13 @@
 ingestion:
   camera_topics:                                                                            # List of ROS2 camera topics to extract frames from (per-camera Frames; no multi-view fusion).
-    - "/lucid_vision/lucid_cam_front_left/image_rect/compressed"
     - "/lucid_vision/lucid_cam_front_center/image_rect/compressed"
+    - "/lucid_vision/lucid_cam_front_left/image_rect/compressed"
     - "/lucid_vision/lucid_cam_front_right/image_rect/compressed"
   sampling_fps: 1.0                                                                          # Subsampling rate per camera: 1.0 means 1 frame per second per topic.
   long_side: 840                                                                             # Aspect-preserving long-edge budget for stored thumbnails (configurable; tune during testing). 840 = 60*14.
   batch_size: 8                                                                              # Hint for embedder batching (the embedder owns real batching).
+  gps_topic: "/oxts/nav_sat_fix"   # GPS topic read during extraction for Map search (null => no GPS read)
+  gps_max_gap_sec: 1.0             # Nearest-Fix join tolerance (seconds); frames with no Fix within this gap get no location
 
 storage:
   artifact_dir: ".bag_chat"                                                                 # The name of the hidden artifact folder created to store app data.
@@ -23,6 +25,7 @@ models:
 
 search:
   temporal_dedup_window_sec: 20.0                                                             # Suppress lower-scoring hits from the same bag/topic sequence within +/- this temporal window around a better-scoring frame.
+  map_browse_cap: 500             # Max Map-browse results returned after temporal dedup
 
 region_search:
   enabled: true                 # gated by embedder 'dense' capability; off => no dense pass, no RegionSearcher

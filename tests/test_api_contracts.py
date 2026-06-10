@@ -28,7 +28,7 @@ class FakeSearchService:
     def __init__(self, should_fail: bool = False):
         self.should_fail = should_fail
 
-    def search(self, query: str, bag_paths: list[str], top_k: int) -> list[dict]:
+    def search(self, query: str, bag_paths: list[str], top_k: int, area=None) -> list[dict]:
         _ = query
         if self.should_fail:
             raise ValueError("Must provide at least one bag path.")
@@ -48,13 +48,14 @@ class FakeSearchService:
         image_bytes: bytes,
         bag_paths: list[str],
         top_k: int,
+        area=None,
     ) -> list[dict]:
         _ = image_bytes
         if self.should_fail:
             raise ValueError("Must provide at least one bag path.")
         return self.search(query="image", bag_paths=bag_paths, top_k=top_k)
 
-    def search_similar(self, file_path: str, bag_paths: list[str], top_k: int) -> list[dict]:
+    def search_similar(self, file_path: str, bag_paths: list[str], top_k: int, area=None) -> list[dict]:
         if self.should_fail:
             raise ValueError("Must provide at least one bag path.")
         if file_path == "/missing.jpg":

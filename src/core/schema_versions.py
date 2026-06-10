@@ -12,6 +12,8 @@ Version history:
       per-camera subdirectories.
   4 — Adds optional `region_index` stamp (Region search faiss patch index);
       CLS frame layout unchanged from v3.
+  5 — Adds optional per-frame `lat`/`lon` (Frame location) + top-level `gps` stamp
+      (Map search). CLS/region layout unchanged from v4.
 """
 
-METADATA_SCHEMA_VERSION = 4
+METADATA_SCHEMA_VERSION = 5

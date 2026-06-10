@@ -20,13 +20,13 @@ def _client_with_stub(bypass_auth, stub):
 
 
 class _SvcStub:
-    def search_by_text(self, text, bag_paths, top_k):
+    def search_by_text(self, text, bag_paths, top_k, area=None):
         return [{"timestamp_ns": 1, "topic": "/cam/a", "similarity_score": 0.9}]
 
-    def search_by_frame(self, support_file_path, points, bag_paths, top_k):
+    def search_by_frame(self, support_file_path, points, bag_paths, top_k, area=None):
         return [{"timestamp_ns": 2, "topic": "/cam/a", "similarity_score": 0.8}]
 
-    def search_by_image(self, image_bytes, points, bag_paths, top_k):
+    def search_by_image(self, image_bytes, points, bag_paths, top_k, area=None):
         return [{"timestamp_ns": 3, "topic": "/cam/a", "similarity_score": 0.7}]
 
     def heatmap_by_text(self, text, target_file_path):
@@ -91,10 +91,10 @@ def test_region_heatmap_by_image_endpoint(bypass_auth):
 
 
 class _StubSearcher:
-    def search_by_text(self, text, bag_paths, top_k):
+    def search_by_text(self, text, bag_paths, top_k, area=None):
         return [{"ok": True, "text": text, "n": len(bag_paths), "top_k": top_k}]
 
-    def search_by_points(self, image, points, bag_paths, top_k, exclude_file_path=None):
+    def search_by_points(self, image, points, bag_paths, top_k, exclude_file_path=None, area=None):
         return [{"points": len(points), "exclude": exclude_file_path}]
 
 

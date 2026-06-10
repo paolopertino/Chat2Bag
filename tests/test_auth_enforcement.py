@@ -24,6 +24,7 @@ def unauthenticated_client_for():
     "router, method, path",
     [
         (bags_router, "GET", "/api/bags/scan?root_dir=/tmp"),
+        (bags_router, "GET", "/api/bags/track?bag_path=/tmp/x"),
         (chat_router, "POST", "/api/chat"),
         (datasets_router, "GET", "/api/datasets/jobs"),
         (image_router, "GET", "/api/image?path=/tmp/x.jpg"),

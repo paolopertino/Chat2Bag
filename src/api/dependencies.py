@@ -4,6 +4,7 @@ from src.api.state import indexing_status
 from src.services.chat_service import ChatService
 from src.services.extraction_service import ExtractionService
 from src.services.indexing_service import IndexingService
+from src.services.map_search_service import MapSearchService
 from src.services.region_search_service import RegionSearchService
 from src.services.search_service import SearchService
 
@@ -29,6 +30,10 @@ def get_region_search_service(request: Request) -> RegionSearchService:
             detail="Region search is not available with the active embedding backend.",
         )
     return RegionSearchService(searcher=searcher)
+
+
+def get_map_search_service(request: Request) -> MapSearchService:
+    return request.app.state.component_factory.create_map_search_service()
 
 
 def get_chat_service(request: Request) -> ChatService:

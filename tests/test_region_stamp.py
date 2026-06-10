@@ -7,9 +7,9 @@ from src.core.index_stamp import (
 )
 
 
-def test_metadata_schema_version_is_4():
+def test_metadata_schema_version_is_5():
     from src.core.schema_versions import METADATA_SCHEMA_VERSION
-    assert METADATA_SCHEMA_VERSION == 4
+    assert METADATA_SCHEMA_VERSION == 5
 
 
 def test_read_region_returns_none_when_unstamped(tmp_path):

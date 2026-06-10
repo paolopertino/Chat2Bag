@@ -5,9 +5,11 @@ import { toast } from "sonner";
 
 import type { Point, SearchResult } from "../api/types";
 import { ResultsGrid } from "../components/search/results-grid";
+import { AreaChip } from "../components/search/area-chip";
 import { BagPickerChip } from "../components/search/bag-picker-chip";
 import { FilterChip } from "../components/search/filter-chip";
-import { RegionResultLightbox } from "../components/search/region-result-lightbox";
+import { MapAreaDialog } from "../components/search/map-area-dialog";
+import { SampleResultLightbox } from "../components/search/sample-result-lightbox";
 import { RegionSupportChip } from "../components/search/region-support-chip";
 import { RegionSupportDialog, type RegionSupport } from "../components/search/region-support-dialog";
 import { SearchInput } from "../components/search/search-input";
@@ -15,7 +17,10 @@ import { SearchModeToggle, type SearchMode } from "../components/search/search-m
 import { Button } from "../components/ui/button";
 import { useBags } from "../context/bags-context";
 import { useRegionSearch } from "../hooks/use-region-search";
+import { useBagTracks } from "../hooks/use-bag-tracks";
+import { useMapArea } from "../hooks/use-map-area";
 import { useUrlSearch } from "../hooks/use-url-search";
+import { countInArea } from "../lib/area-geo";
 import { encodeBagId } from "../lib/bag-id";
 
 const EXAMPLES = ["pedestrian on the crosswalk", "parked car", "traffic light"];
@@ -32,6 +37,12 @@ export function SearchPage() {
   const search = useUrlSearch();
   const region = useRegionSearch();
 
+  const { area, setArea, clearArea } = useMapArea();
+  const { tracksForSelected } = useBagTracks(search.bagPaths);
+  const [mapOpen, setMapOpen] = useState(false);
+  const locatedBagCount = bags.filter((b) => b.is_located).length;
+  const areaCount = area ? countInArea(area, tracksForSelected()) : null;
+
   const [globalDraft, setGlobalDraft] = useState(search.q);
   const [regionDraft, setRegionDraft] = useState("");
 
@@ -39,7 +50,7 @@ export function SearchPage() {
   const [editingSupport, setEditingSupport] = useState<RegionSupport | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitialPoints, setDialogInitialPoints] = useState<Point[]>([]);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightbox, setLightbox] = useState<{ mode: "global" | "region"; index: number } | null>(null);
 
   // Keep the global draft in sync when the URL q changes externally.
   useEffect(() => {
@@ -51,6 +62,20 @@ export function SearchPage() {
     if (mode === "region" && (search.q !== "" || search.similar !== "")) search.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, search.q, search.similar]);
+
+  // Region search is imperative (not URL-driven), so changing the Area while a region
+  // query is active won't re-fetch on its own. Re-run it here so the Area composes with
+  // Region the same way it does with Global. Guarded to fire only on actual Area change.
+  const areaParam = searchParams.get("area");
+  const prevAreaParamRef = useRef(areaParam);
+  useEffect(() => {
+    if (prevAreaParamRef.current === areaParam) return;
+    prevAreaParamRef.current = areaParam;
+    if (mode === "region" && region.query) {
+      region.rerunWithArea(search.bagPaths, search.topK, area ?? undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaParam]);
 
   // One-shot handoff from the Bag Explorer: /search?mode=region&support=<frame path>
   // seeds the point-canvas dialog with that frame, then strips the param.
@@ -87,12 +112,12 @@ export function SearchPage() {
       params.delete("mode");
     }
     setSearchParams(params, { replace: false });
+    setLightbox(null);
     if (next === "region") {
       setGlobalDraft("");
     } else {
       region.clear();
       setRegionDraft("");
-      setLightboxIndex(null);
     }
   };
 
@@ -120,7 +145,7 @@ export function SearchPage() {
   // point-canvas dialog seeded with that frame.
   const handleUseForRegion = (result: SearchResult) => {
     if (mode !== "region") setMode("region");
-    setLightboxIndex(null);
+    setLightbox(null);
     setEditingSupport({ kind: "frame", filePath: result.file_path });
     setDialogInitialPoints([]);
     setDialogOpen(true);
@@ -130,18 +155,25 @@ export function SearchPage() {
     setDialogOpen(false);
     if (!editingSupport) return;
     if (editingSupport.kind === "image") {
-      region.runImage(editingSupport.file, editingSupport.objectUrl, points, search.bagPaths, search.topK);
+      region.runImage(editingSupport.file, editingSupport.objectUrl, points, search.bagPaths, search.topK, area ?? undefined);
     } else {
-      region.runFrame(editingSupport.filePath, points, search.bagPaths, search.topK);
+      region.runFrame(editingSupport.filePath, points, search.bagPaths, search.topK, area ?? undefined);
     }
   };
 
-  const openLightbox = (result: SearchResult) => {
-    const filtered = region.results.filter((r) => r.similarity_score >= search.minScore);
-    const i = filtered.findIndex(
+  const openGlobalLightbox = (result: SearchResult) => {
+    const index = search.results.findIndex(
       (r) => r.file_path === result.file_path && r.timestamp_ns === result.timestamp_ns,
     );
-    if (i >= 0) setLightboxIndex(i);
+    if (index >= 0) setLightbox({ mode: "global", index });
+  };
+
+  const openRegionLightbox = (result: SearchResult) => {
+    const filtered = region.results.filter((r) => (r.similarity_score ?? 1) >= search.minScore);
+    const index = filtered.findIndex(
+      (r) => r.file_path === result.file_path && r.timestamp_ns === result.timestamp_ns,
+    );
+    if (index >= 0) setLightbox({ mode: "region", index });
   };
 
   // No bags scanned at all → hard block with CTA.
@@ -160,10 +192,12 @@ export function SearchPage() {
     );
   }
 
-  const regionResults = region.results.filter((r) => r.similarity_score >= search.minScore);
+  const regionResults = region.results.filter((r) => (r.similarity_score ?? 1) >= search.minScore);
   const hasGlobalQuery = search.q !== "" || search.similar !== "";
   const hasRegionQuery = region.query !== null;
+  const isBrowse = mode === "global" && !hasGlobalQuery && area !== null;
   const hidden = search.rawResultCount - search.results.length;
+  const lightboxResults = lightbox?.mode === "global" ? search.results : lightbox?.mode === "region" ? regionResults : [];
 
   return (
     <div className="space-y-3">
@@ -198,7 +232,7 @@ export function SearchPage() {
                   toast.error("Index at least one bag to search.");
                   return;
                 }
-                region.runText(text, search.bagPaths, search.topK);
+                region.runText(text, search.bagPaths, search.topK, area ?? undefined);
               }}
               onClear={() => setRegionDraft("")}
               onImageUpload={handleRegionUpload}
@@ -206,6 +240,13 @@ export function SearchPage() {
           )}
         </div>
         <BagPickerChip selectedBagIds={search.urlBags} onChange={(ids) => search.setBags(ids)} />
+        <AreaChip
+          area={area}
+          count={areaCount}
+          disabled={locatedBagCount === 0}
+          onEdit={() => setMapOpen(true)}
+          onClear={clearArea}
+        />
       </div>
 
       {mode === "region" && region.query && region.query.kind !== "text" ? (
@@ -217,19 +258,19 @@ export function SearchPage() {
         />
       ) : null}
 
-      {(mode === "global" && hasGlobalQuery) || (mode === "region" && hasRegionQuery) ? (
+      {(mode === "global" && (hasGlobalQuery || isBrowse)) || (mode === "region" && hasRegionQuery) ? (
         <FilterChip
           topK={search.topK}
-          minScore={search.minScore}
+          minScore={isBrowse ? undefined : search.minScore}
           rawResultCount={mode === "global" ? search.rawResultCount : region.results.length}
           bagCount={search.bagPaths.length || indexedCount}
           onTopKChange={search.setTopK}
-          onMinScoreChange={search.setMinScore}
+          onMinScoreChange={isBrowse ? undefined : search.setMinScore}
         />
       ) : null}
 
       {mode === "global" ? (
-        !hasGlobalQuery ? (
+        !hasGlobalQuery && !isBrowse ? (
           <EmptyState
             indexedCount={indexedCount}
             onPick={(text) => {
@@ -247,6 +288,7 @@ export function SearchPage() {
           <ResultsGrid
             results={search.results}
             isSearching={false}
+            onResultClick={openGlobalLightbox}
             getResultHref={getResultHref}
             onSimilarSearch={handleSimilar}
             onUseAsRegionSupport={handleUseForRegion}
@@ -260,7 +302,7 @@ export function SearchPage() {
         <RegionEmptyState
           onPick={(text) => {
             setRegionDraft(text);
-            region.runText(text, search.bagPaths, search.topK);
+            region.runText(text, search.bagPaths, search.topK, area ?? undefined);
           }}
         />
       ) : region.isSearching ? (
@@ -271,7 +313,8 @@ export function SearchPage() {
         <ResultsGrid
           results={regionResults}
           isSearching={false}
-          onResultClick={openLightbox}
+          onResultClick={openRegionLightbox}
+          getResultHref={getResultHref}
           onUseAsRegionSupport={handleUseForRegion}
         />
       )}
@@ -284,13 +327,21 @@ export function SearchPage() {
         onConfirm={handleConfirmSupport}
       />
 
-      {lightboxIndex !== null && regionResults[lightboxIndex] ? (
-        <RegionResultLightbox
-          results={regionResults}
-          index={lightboxIndex}
-          onIndexChange={setLightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          fetchHeatmap={region.fetchHeatmap}
+      <MapAreaDialog
+        open={mapOpen}
+        initialArea={area}
+        tracks={tracksForSelected()}
+        onClose={() => setMapOpen(false)}
+        onConfirm={(next) => { setMapOpen(false); setArea(next); }}
+      />
+
+      {lightbox && lightboxResults[lightbox.index] ? (
+        <SampleResultLightbox
+          results={lightboxResults}
+          index={lightbox.index}
+          onIndexChange={(index) => setLightbox({ mode: lightbox.mode, index })}
+          onClose={() => setLightbox(null)}
+          fetchHeatmap={lightbox.mode === "region" ? region.fetchHeatmap : undefined}
           getResultHref={getResultHref}
           onUseAsRegionSupport={handleUseForRegion}
         />

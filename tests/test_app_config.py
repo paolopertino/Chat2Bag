@@ -7,6 +7,8 @@ _FAKE_SETTINGS = {
         "sampling_fps": 1.0,
         "long_side": 840,
         "batch_size": 8,
+        "gps_topic": "/oxts/nav_sat_fix",
+        "gps_max_gap_sec": 1.0,
     },
     "storage": {"artifact_dir": ".bag_chat", "storage_path": None},
     "embedding": {"backend": "siglip2", "model": "google/siglip2-base-patch16-naflex"},
@@ -15,7 +17,7 @@ _FAKE_SETTINGS = {
         "video_vlm": "qwen3-vl:2b",
         "model_storage": "models",
     },
-    "search": {"temporal_dedup_window_sec": 20.0},
+    "search": {"temporal_dedup_window_sec": 20.0, "map_browse_cap": 500},
     "api": {"scan_timeout_sec": 30.0},
     "extraction": {"service_url": None},
 }
@@ -59,6 +61,34 @@ def test_region_search_config_defaults(monkeypatch):
         assert rc.top_k_patches == 1
         assert rc.refine_enabled is False and rc.refine_top_n == 100
         assert "a photo of a {}." in rc.text_templates
+    finally:
+        app_config_mod.get_app_config.cache_clear()
+
+
+def test_ingestion_gps_fields_parsed(monkeypatch):
+    monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
+    app_config_mod.get_app_config.cache_clear()
+    try:
+        cfg = app_config_mod.get_app_config()
+        assert cfg.ingestion.gps_topic == "/oxts/nav_sat_fix"
+        assert cfg.ingestion.gps_max_gap_sec == 1.0
+        assert cfg.search.map_browse_cap == 500
+    finally:
+        app_config_mod.get_app_config.cache_clear()
+
+
+def test_gps_fields_default_when_absent(monkeypatch):
+    trimmed = {**_FAKE_SETTINGS, "ingestion": {
+        k: v for k, v in _FAKE_SETTINGS["ingestion"].items()
+        if k not in ("gps_topic", "gps_max_gap_sec")
+    }, "search": {}}
+    monkeypatch.setattr(app_config_mod, "get_settings", lambda: trimmed)
+    app_config_mod.get_app_config.cache_clear()
+    try:
+        cfg = app_config_mod.get_app_config()
+        assert cfg.ingestion.gps_topic is None
+        assert cfg.ingestion.gps_max_gap_sec == 1.0
+        assert cfg.search.map_browse_cap == 500
     finally:
         app_config_mod.get_app_config.cache_clear()
 

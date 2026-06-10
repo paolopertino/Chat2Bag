@@ -12,6 +12,8 @@ from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_stamp_compatible, read_embedder_stamp
 from src.core.storage import resolve_artifact_path
 from src.embedding import FrameEmbedder, create_embedder
+from src.geo.area import area_from_payload
+from src.geo.locator import resolve_area_to_frames
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +102,21 @@ class GlobalSearcher:
         bag_paths: List[str],
         top_k: int,
         exclude_file_path: str | None = None,
+        area: dict | None = None,
     ) -> list[dict]:
         """Searches a query vector across one or more compatible bag indices."""
 
         exclude_path = None
         if exclude_file_path:
             exclude_path = str(Path(exclude_file_path).expanduser().resolve())
+
+        area_obj = area_from_payload(area)
+        in_area: dict[str, set[str]] | None = None
+        if area_obj is not None:
+            in_area = {
+                bp: {lf.file_path for lf in located}
+                for bp, located in resolve_area_to_frames(area_obj, bag_paths).items()
+            }
 
         all_results = []
         for bag_path in self._compatible_bags(bag_paths):
@@ -121,9 +132,14 @@ class GlobalSearcher:
 
             # Pull extra rows to account for self-exclusion and temporal de-dup suppression.
             fetch_limit = max(top_k * 3, top_k + 10)
-            results = (
-                table.search(query_vector).metric("cosine").limit(fetch_limit).to_list()
-            )
+            query = table.search(query_vector).metric("cosine")
+            if in_area is not None:
+                allowed = in_area.get(bag_path, set())
+                if not allowed:
+                    continue  # bag has no in-area frames
+                clause = "file_path IN (" + ", ".join("'" + fp + "'" for fp in allowed) + ")"
+                query = query.where(clause, prefilter=True)
+            results = query.limit(fetch_limit).to_list()
             for res in results:
                 if exclude_path and str(Path(res["file_path"]).resolve()) == exclude_path:
                     continue
@@ -138,22 +154,23 @@ class GlobalSearcher:
         deduped_results = self._apply_temporal_dedup(all_results)
         return deduped_results[:top_k]
 
-    def search(self, query: str, bag_paths: List[str], top_k: int = 5):
+    def search(self, query: str, bag_paths: List[str], top_k: int = 5, area: dict | None = None):
         """Embeds text once and searches across multiple LanceDB indices."""
         logger.info("Embedding query: '%s'", query)
         query_vector = self._embedder.embed_text([query])[0].tolist()
-        return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k)
+        return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k, area=area)
 
-    def search_by_image_bytes(self, image_bytes: bytes, bag_paths: List[str], top_k: int = 5):
+    def search_by_image_bytes(self, image_bytes: bytes, bag_paths: List[str], top_k: int = 5, area: dict | None = None):
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         query_vector = self._embedder.embed_images([image])[0].tolist()
-        return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k)
+        return self._search_vector(query_vector=query_vector, bag_paths=bag_paths, top_k=top_k, area=area)
 
     def search_similar_by_file_path(
         self,
         file_path: str,
         bag_paths: List[str],
         top_k: int = 5,
+        area: dict | None = None,
     ):
         image_path = Path(file_path).expanduser().resolve()
         image = Image.open(image_path).convert("RGB")
@@ -163,4 +180,5 @@ class GlobalSearcher:
             bag_paths=bag_paths,
             top_k=top_k,
             exclude_file_path=str(image_path),
+            area=area,
         )

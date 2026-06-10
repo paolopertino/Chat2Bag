@@ -1,4 +1,5 @@
 import type {
+  Area,
   ChatResponse,
   BagInfoResponse,
   BagStatusResponse,
@@ -12,18 +13,22 @@ import type {
   Point,
   ScanBagsResponse,
   SearchResponse,
+  SamplesResponse,
+  TrackResponse,
 } from "./types";
 
 interface SearchRequest {
   query: string;
   bag_paths: string[];
   top_k: number;
+  area?: Area;
 }
 
 interface SimilarSearchRequest {
   file_path: string;
   bag_paths: string[];
   top_k: number;
+  area?: Area;
 }
 
 interface IndexRequest {
@@ -220,6 +225,37 @@ export async function getFrames(
   return http<FramesResponse>(`/api/bags/frames?${params.toString()}`);
 }
 
+export async function getSamples(
+  bagPath: string,
+  startNs: number,
+  durationSec: number,
+  focusFilePath?: string,
+): Promise<SamplesResponse> {
+  const params = new URLSearchParams({
+    bag_path: bagPath,
+    start_ns: String(startNs),
+    duration_sec: String(durationSec),
+  });
+  if (focusFilePath) params.set("focus_file_path", focusFilePath);
+  return http<SamplesResponse>(`/api/bags/samples?${params.toString()}`);
+}
+
+export async function getTrack(bagPath: string, stride = 1): Promise<TrackResponse> {
+  const params = new URLSearchParams({ bag_path: bagPath, stride: String(stride) });
+  return http<TrackResponse>(`/api/bags/track?${params.toString()}`);
+}
+
+export async function searchMap(
+  area: Area,
+  bagPaths: string[],
+  topK?: number,
+): Promise<SearchResponse> {
+  return http<SearchResponse>("/api/search/map", {
+    method: "POST",
+    body: JSON.stringify({ area, bag_paths: bagPaths, ...(topK ? { top_k: topK } : {}) }),
+  });
+}
+
 export async function search(payload: SearchRequest): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search", {
     method: "POST",
@@ -231,11 +267,13 @@ export async function searchByImage(
   file: File,
   bagPaths: string[],
   topK: number,
+  area?: Area,
 ): Promise<SearchResponse> {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("top_k", String(topK));
   for (const bagPath of bagPaths) formData.append("bag_paths", bagPath);
+  if (area) formData.append("area", JSON.stringify(area));
   return http<SearchResponse>("/api/search/image", {
     method: "POST",
     body: formData,
@@ -296,10 +334,11 @@ export async function regionSearchByText(
   text: string,
   bagPaths: string[],
   topK: number,
+  area?: Area,
 ): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search/region/by-text", {
     method: "POST",
-    body: JSON.stringify({ text, bag_paths: bagPaths, top_k: topK }),
+    body: JSON.stringify({ text, bag_paths: bagPaths, top_k: topK, ...(area ? { area } : {}) }),
   });
 }
 
@@ -308,6 +347,7 @@ export async function regionSearchByFrame(
   points: Point[],
   bagPaths: string[],
   topK: number,
+  area?: Area,
 ): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search/region/by-frame", {
     method: "POST",
@@ -316,6 +356,7 @@ export async function regionSearchByFrame(
       points,
       bag_paths: bagPaths,
       top_k: topK,
+      ...(area ? { area } : {}),
     }),
   });
 }
@@ -325,12 +366,14 @@ export async function regionSearchByImage(
   points: Point[],
   bagPaths: string[],
   topK: number,
+  area?: Area,
 ): Promise<SearchResponse> {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("points", JSON.stringify(points));
   formData.append("top_k", String(topK));
   for (const bagPath of bagPaths) formData.append("bag_paths", bagPath);
+  if (area) formData.append("area", JSON.stringify(area));
   return http<SearchResponse>("/api/search/region/by-image", {
     method: "POST",
     body: formData,

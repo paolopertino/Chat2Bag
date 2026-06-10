@@ -12,6 +12,8 @@ class IngestionConfig:
     sampling_fps: float
     long_side: int
     batch_size: int
+    gps_topic: Optional[str]
+    gps_max_gap_sec: float
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ class EmbeddingConfig:
 @dataclass(frozen=True)
 class SearchConfig:
     temporal_dedup_window_sec: float
+    map_browse_cap: int
 
 
 @dataclass(frozen=True)
@@ -135,6 +138,12 @@ def get_app_config() -> AppConfig:
             sampling_fps=float(settings["ingestion"]["sampling_fps"]),
             long_side=int(settings["ingestion"]["long_side"]),
             batch_size=int(settings["ingestion"]["batch_size"]),
+            gps_topic=(
+                str(settings["ingestion"]["gps_topic"])
+                if settings["ingestion"].get("gps_topic")
+                else None
+            ),
+            gps_max_gap_sec=float(settings["ingestion"].get("gps_max_gap_sec", 1.0)),
         ),
         storage=StorageConfig(
             artifact_dir=str(settings["storage"]["artifact_dir"]),
@@ -154,6 +163,7 @@ def get_app_config() -> AppConfig:
             temporal_dedup_window_sec=float(
                 settings.get("search", {}).get("temporal_dedup_window_sec", 0.0)
             ),
+            map_browse_cap=int(settings.get("search", {}).get("map_browse_cap", 500)),
         ),
         api=ApiConfig(
             scan_timeout_sec=float(

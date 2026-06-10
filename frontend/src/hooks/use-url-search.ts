@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useSearch } from "./use-search";
 import { useBags } from "../context/bags-context";
 import { decodeBagId } from "../lib/bag-id";
+import { decodeArea } from "../lib/area-codec";
+import type { Area } from "../api/types";
 
 const TOP_K_DEFAULT = 25;
 const MIN_SCORE_DEFAULT = 0;
@@ -62,6 +64,7 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
   // Read URL state, with normalization
   const q = searchParams.get("q") ?? "";
   const similar = searchParams.get("similar") ?? "";
+  const area: Area | null = decodeArea(searchParams.get("area"));
   const rawTopKStr = searchParams.get("topK");
   const rawMinScoreStr = searchParams.get("minScore");
   const rawTopK = rawTopKStr !== null ? Number(rawTopKStr) : NaN;
@@ -134,19 +137,21 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
 
   // Trigger backend fetch whenever the relevant param tuple changes.
   useEffect(() => {
-    const key = JSON.stringify({ q, similar, topK, bags: effectiveBagPaths });
+    const key = JSON.stringify({ q, similar, topK, bags: effectiveBagPaths, area: searchParams.get("area") });
     if (key === lastFetchKeyRef.current) return;
     lastFetchKeyRef.current = key;
 
     if (similar) {
       void search.runSimilarSearch({ file_path: similar }, effectiveBagPaths, topK);
     } else if (q) {
-      void search.runSearch(effectiveBagPaths, q, topK);
+      void search.runSearch(effectiveBagPaths, q, topK, area ?? undefined);
+    } else if (area) {
+      void search.runMapBrowse(area, effectiveBagPaths, topK);
     } else {
       search.clearResults();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, similar, topK, effectiveBagPaths.join(",")]);
+  }, [q, similar, topK, effectiveBagPaths.join(","), searchParams.get("area")]);
 
   // Public actions
   const submitText = useCallback(
@@ -201,7 +206,7 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
 
   // Client-side score filter
   const filteredResults = useMemo(
-    () => search.results.filter((r) => r.similarity_score >= minScore),
+    () => search.results.filter((r) => (r.similarity_score ?? 1) >= minScore),
     [search.results, minScore],
   );
 
@@ -210,6 +215,7 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     similar,
     topK,
     minScore,
+    area,
     /** Effective bag PATHS for the fetch (decoded; or scope override; or all indexed by default). */
     bagPaths: effectiveBagPaths,
     /** Raw encoded bag IDs from the URL (for the chip's selection state). */

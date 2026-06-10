@@ -1,11 +1,11 @@
-from typing import List
-from typing import Annotated
+from typing import Annotated, List, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_region_search_service, get_search_service
+from src.api.dependencies import get_map_search_service, get_region_search_service, get_search_service
 from src.auth.dependencies import require_current_user
+from src.services.map_search_service import MapSearchService
 from src.services.region_search_service import RegionSearchService
 from src.services.search_service import SearchService
 
@@ -16,16 +16,43 @@ router = APIRouter(
 )
 
 
+class LatLon(BaseModel):
+    lat: float = Field(..., ge=-90.0, le=90.0)
+    lon: float = Field(..., ge=-180.0, le=180.0)
+
+
+class CircleArea(BaseModel):
+    kind: Literal["circle"]
+    center: LatLon
+    radius_m: float = Field(..., gt=0.0)
+
+
+class PolygonArea(BaseModel):
+    kind: Literal["polygon"]
+    vertices: List[LatLon] = Field(..., min_length=3)
+
+
+Area = Annotated[Union[CircleArea, PolygonArea], Field(discriminator="kind")]
+
+
+class MapSearchRequest(BaseModel):
+    area: Area
+    bag_paths: List[str]
+    top_k: Optional[int] = Field(default=None, ge=1, le=2000)
+
+
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1)
     bag_paths: List[str]
     top_k: int = Field(default=5, ge=1, le=100)
+    area: Optional[Area] = None
 
 
 class SimilarSearchRequest(BaseModel):
     file_path: str = Field(..., min_length=1)
     bag_paths: List[str]
     top_k: int = Field(default=5, ge=1, le=100)
+    area: Optional[Area] = None
 
 
 class Point(BaseModel):
@@ -38,12 +65,14 @@ class RegionByFrameRequest(BaseModel):
     points: List[Point] = Field(..., min_length=1)
     bag_paths: List[str]
     top_k: int = Field(default=5, ge=1, le=100)
+    area: Optional[Area] = None
 
 
 class RegionByTextRequest(BaseModel):
     text: str = Field(..., min_length=1)
     bag_paths: List[str]
     top_k: int = Field(default=5, ge=1, le=100)
+    area: Optional[Area] = None
 
 
 class RegionHeatmapTextRequest(BaseModel):
@@ -68,11 +97,27 @@ async def search_bags(
             query=req.query,
             bag_paths=req.bag_paths,
             top_k=req.top_k,
+            area=req.area.model_dump() if req.area else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"query": req.query, "results": results}
+
+
+@router.post("/search/map")
+async def search_map(
+    req: MapSearchRequest,
+    service: Annotated[MapSearchService, Depends(get_map_search_service)],
+):
+    """Standalone Map browse: chronological, temporal-deduped in-area Frames."""
+    try:
+        results = service.browse(
+            area_payload=req.area.model_dump(), bag_paths=req.bag_paths, top_k=req.top_k,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"query": "map", "results": results}
 
 
 @router.post("/search/image")
@@ -81,14 +126,18 @@ async def search_bags_by_image(
     image: UploadFile = File(...),
     bag_paths: List[str] = Form(...),
     top_k: int = Form(default=5, ge=1, le=100),
+    area: Optional[str] = Form(default=None),
 ):
     """Federated image search across multiple bags using uploaded image content."""
+    import json as _json
     try:
         image_bytes = await image.read()
+        parsed_area = _json.loads(area) if area else None
         results = search_service.search_by_image(
             image_bytes=image_bytes,
             bag_paths=bag_paths,
             top_k=top_k,
+            area=parsed_area,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -109,6 +158,7 @@ async def search_similar_images(
             file_path=req.file_path,
             bag_paths=req.bag_paths,
             top_k=req.top_k,
+            area=req.area.model_dump() if req.area else None,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -127,7 +177,8 @@ async def region_search_by_text(
 ):
     """Region search across bags using a text query (template-ensembled)."""
     try:
-        results = service.search_by_text(text=req.text, bag_paths=req.bag_paths, top_k=req.top_k)
+        results = service.search_by_text(text=req.text, bag_paths=req.bag_paths, top_k=req.top_k,
+                                          area=req.area.model_dump() if req.area else None)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"query": req.text, "results": results}
@@ -145,6 +196,7 @@ async def region_search_by_frame(
             points=[p.model_dump() for p in req.points],
             bag_paths=req.bag_paths,
             top_k=req.top_k,
+            area=req.area.model_dump() if req.area else None,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -162,15 +214,18 @@ async def region_search_by_image(
     points: str = Form(...),
     bag_paths: List[str] = Form(...),
     top_k: int = Form(default=5, ge=1, le=100),
+    area: Optional[str] = Form(default=None),
 ):
     """Region search from points on an uploaded Support image. `points` is a JSON array."""
     import json as _json
 
     try:
         parsed_points = _json.loads(points)
+        parsed_area = _json.loads(area) if area else None
         image_bytes = await image.read()
         results = service.search_by_image(
             image_bytes=image_bytes, points=parsed_points, bag_paths=bag_paths, top_k=top_k,
+            area=parsed_area,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

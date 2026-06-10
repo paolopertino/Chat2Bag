@@ -6,6 +6,8 @@ export interface BagInfo {
   is_indexed: boolean;
   status: BagStatus;
   error_message?: string | null;
+  is_located?: boolean;
+  located_frame_count?: number;
 }
 
 export interface ScanBagsResponse {
@@ -31,8 +33,11 @@ export interface SearchResult {
   timestamp_ns: number;
   file_path: string;
   topic: string;
-  similarity_score: number;
+  similarity_score?: number;   // absent for Map browse rows
   source_bag: string;
+  lat?: number;
+  lon?: number;
+  distance_m?: number;
 }
 
 export interface SearchResponse {
@@ -44,6 +49,14 @@ export interface Point {
   x: number;
   y: number;
 }
+
+export interface LatLon { lat: number; lon: number; }
+export type Area =
+  | { kind: "circle"; center: LatLon; radius_m: number }
+  | { kind: "polygon"; vertices: LatLon[] };
+
+export interface TrackPoint { lat: number; lon: number; timestamp_ns: number; }
+export interface TrackResponse { bag_path: string; points: TrackPoint[]; }
 
 export interface HeatmapResponse {
   height: number;
@@ -59,6 +72,28 @@ export interface FrameInfo {
 export interface FramesResponse {
   bag_path: string;
   frames: FrameInfo[];
+}
+
+export interface SampleFrameInfo {
+  timestamp_ns: number;
+  topic: string;
+  file_path: string;
+  delta_ns: number;
+  is_focus?: boolean;
+}
+
+export interface SampleInfo {
+  timestamp_ns: number;
+  anchor_frame: SampleFrameInfo | null;
+  frames_by_camera: Record<string, SampleFrameInfo>;
+}
+
+export interface SamplesResponse {
+  bag_path: string;
+  cameras: string[];
+  anchor_camera: string | null;
+  sample_tolerance_ns: number;
+  samples: SampleInfo[];
 }
 
 export interface ChatResponse {

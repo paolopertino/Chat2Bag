@@ -20,12 +20,12 @@ export function usePins(
   const searchPins = useMemo<Pin[]>(() => {
     if (!bagPath) return [];
     return results
-      .filter((r) => r.bag_path === bagPath && r.similarity_score >= minScore)
+      .filter((r) => r.bag_path === bagPath && (r.similarity_score ?? 1) >= minScore)
       .map<Pin>((r) => ({
         timestamp_ns: r.timestamp_ns,
         source: "search",
-        score: r.similarity_score,
-        label: `${r.similarity_score.toFixed(2)} · ${r.topic}`,
+        score: r.similarity_score ?? 1,
+        label: `${(r.similarity_score ?? 1).toFixed(2)} · ${r.topic}`,
       }));
   }, [bagPath, results, minScore]);
 
