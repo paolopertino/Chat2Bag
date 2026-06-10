@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from src.api.search_routes import (
     RegionByFrameRequest,
     RegionByTextRequest,
@@ -28,9 +31,6 @@ def test_top_k_allows_up_to_500():
 
 
 def test_top_k_rejects_above_500():
-    import pytest
-    from pydantic import ValidationError
-
     with pytest.raises(ValidationError):
         SearchRequest(query="x", bag_paths=[], top_k=501)
     with pytest.raises(ValidationError):
