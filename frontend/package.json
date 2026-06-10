@@ -25,7 +25,7 @@
     "maplibre-gl": "^5.24.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-grid-layout": "^2.2.3",
+    "react-grid-layout": "^1.5.3",
     "react-router-dom": "^7.15.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

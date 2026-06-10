@@ -49,7 +49,7 @@ export function MapHomePage() {
         onStartAreaDraw={setDrawMode}
         supportDialogOpen={supportDialogOpen}
         onSupportDialogOpenChange={setSupportDialogOpen}
-        className="absolute left-1/2 top-4 z-20 w-[min(760px,92vw)] -translate-x-1/2"
+        className="absolute left-1/2 top-4 z-20 w-[min(1080px,94vw)] -translate-x-1/2"
       />
       <ResultsRail
         results={search.results}

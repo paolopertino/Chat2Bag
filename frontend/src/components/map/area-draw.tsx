@@ -9,7 +9,7 @@ import {
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 
 import type { Area, LatLon } from "../../api/types";
-import { useMap } from "./maplibre-map";
+import { useMap, whenStyleReady } from "./maplibre-map";
 
 function haversineMeters(a: LatLon, b: LatLon): number {
   const R = 6371000;
@@ -49,15 +49,25 @@ export function AreaDraw({ mode, onArea, onDone }: AreaDrawProps) {
   const drawRef = useRef<TerraDraw | null>(null);
 
   useEffect(() => {
-    const draw = new TerraDraw({
-      adapter: new TerraDrawMapLibreGLAdapter({ map }),
-      modes: [new TerraDrawPolygonMode(), new TerraDrawCircleMode()],
+    // terra-draw's start() registers GeoJSON sources/layers on the map, which
+    // throws "Style is not done loading" if called before the style loads.
+    // Defer start until the style is ready (matching the other map layers),
+    // and guard against unmount happening before that fires.
+    let cancelled = false;
+    let draw: TerraDraw | null = null;
+    whenStyleReady(map, () => {
+      if (cancelled) return;
+      draw = new TerraDraw({
+        adapter: new TerraDrawMapLibreGLAdapter({ map }),
+        modes: [new TerraDrawPolygonMode(), new TerraDrawCircleMode()],
+      });
+      draw.start();
+      draw.setMode("static");
+      drawRef.current = draw;
     });
-    draw.start();
-    draw.setMode("static");
-    drawRef.current = draw;
     return () => {
-      draw.stop();
+      cancelled = true;
+      if (draw) draw.stop();
       drawRef.current = null;
     };
   }, [map]);

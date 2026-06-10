@@ -20,11 +20,30 @@ export function useMap(): maplibregl.Map {
   return map;
 }
 
-/** Run fn once the style is loaded (immediately if it already is). */
+// Maps whose one-shot "style.load" event has already fired. `isStyleLoaded()`
+// can report false AFTER style.load (e.g. while globe tiles stream in), so it
+// is unsafe to use as the "already loaded" gate: a late caller would register
+// `once("style.load")` for an event that will never fire again, and its work
+// (typically a source.setData) would be lost forever. We instead remember that
+// the style finished loading so late callers run immediately.
+const styleLoaded = new WeakSet<maplibregl.Map>();
+
+/** Run fn once the style has loaded (immediately if it already has). */
 // eslint-disable-next-line react-refresh/only-export-components
 export function whenStyleReady(map: maplibregl.Map, fn: () => void): void {
-  if (map.isStyleLoaded()) fn();
-  else map.once("style.load", fn);
+  if (styleLoaded.has(map)) {
+    fn();
+    return;
+  }
+  if (map.isStyleLoaded()) {
+    styleLoaded.add(map);
+    fn();
+    return;
+  }
+  map.once("style.load", () => {
+    styleLoaded.add(map);
+    fn();
+  });
 }
 
 export function MapLibreMap({ children }: { children?: ReactNode }) {
