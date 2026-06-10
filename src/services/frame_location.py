@@ -33,7 +33,10 @@ def attach_locations(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         if bag_path not in cache:
             cache[bag_path] = _location_index(bag_path)
-        location = cache[bag_path].get((hit.get("topic"), int(hit["timestamp_ns"])))
+        ts = hit.get("timestamp_ns")
+        if ts is None:
+            continue
+        location = cache[bag_path].get((hit.get("topic"), int(ts)))
         if location is not None:
             hit["lat"], hit["lon"] = location
     return hits
