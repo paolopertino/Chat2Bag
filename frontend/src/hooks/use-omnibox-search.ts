@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Area, Point, SearchResult } from "../api/types";
 import { useMapArea } from "./use-map-area";
@@ -41,6 +41,11 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   const { area, setArea } = useMapArea();
   const [text, setText] = useState(url.q);
   const [regionMode, setRegionMode] = useState(false);
+
+  // Sync text when the URL `q` param changes externally (back/forward navigation).
+  useEffect(() => {
+    setText(url.q);
+  }, [url.q]);
   const [support, setSupportState] = useState<SupportSource | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
 
