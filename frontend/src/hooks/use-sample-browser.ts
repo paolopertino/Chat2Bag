@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { chatWithClip, getSamples } from "../api/client";
+import { getSamples } from "../api/client";
 import type { SampleInfo, SamplesResponse, SearchResult } from "../api/types";
 
 const DEFAULT_WINDOW_SECONDS = 10;
@@ -29,28 +29,6 @@ function nearestSampleTimestamp(samples: SampleInfo[], targetNs: number): number
   return best;
 }
 
-function computeClipWindow(
-  centerNs: number,
-  durationSec: number,
-  minNs: number,
-  maxNs: number,
-): { startNs: number; endNs: number } {
-  if (maxNs <= minNs) return { startNs: minNs, endNs: maxNs };
-  const durationNs = Math.max(1, Math.floor(durationSec * 1_000_000_000));
-  const halfDurationNs = Math.floor(durationNs / 2);
-  let startNs = centerNs - halfDurationNs;
-  let endNs = startNs + durationNs;
-  if (startNs < minNs) {
-    startNs = minNs;
-    endNs = startNs + durationNs;
-  }
-  if (endNs > maxNs) {
-    endNs = maxNs;
-    startNs = Math.max(minNs, endNs - durationNs);
-  }
-  return { startNs: Math.max(minNs, startNs), endNs: Math.min(maxNs, endNs) };
-}
-
 export function useSampleBrowser() {
   const requestIdRef = useRef(0);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
@@ -66,10 +44,6 @@ export function useSampleBrowser() {
   const [canLoadMoreRight, setCanLoadMoreRight] = useState(true);
   const [loadedRangeStartNs, setLoadedRangeStartNs] = useState<number | null>(null);
   const [loadedRangeEndNs, setLoadedRangeEndNs] = useState<number | null>(null);
-  const [chatQuery, setChatQuery] = useState("");
-  const [chatDuration, setChatDuration] = useState(DEFAULT_WINDOW_SECONDS);
-  const [chatResponse, setChatResponse] = useState<string | null>(null);
-  const [isChatting, setIsChatting] = useState(false);
 
   const selectedSampleIndex = useMemo(() => {
     if (selectedTimestampNs === null) return -1;
@@ -80,19 +54,6 @@ export function useSampleBrowser() {
     if (selectedTimestampNs === null) return null;
     return samples.find((sample) => sample.timestamp_ns === selectedTimestampNs) ?? null;
   }, [samples, selectedTimestampNs]);
-
-  const frameRange = useMemo(() => {
-    if (samples.length === 0) {
-      const fallback = selectedTimestampNs ?? selectedResult?.timestamp_ns ?? null;
-      return fallback === null ? null : { minNs: fallback, maxNs: fallback };
-    }
-    return { minNs: samples[0].timestamp_ns, maxNs: samples[samples.length - 1].timestamp_ns };
-  }, [samples, selectedResult?.timestamp_ns, selectedTimestampNs]);
-
-  const vlmWindow = useMemo(() => {
-    if (selectedTimestampNs === null || !frameRange) return null;
-    return computeClipWindow(selectedTimestampNs, chatDuration, frameRange.minNs, frameRange.maxNs);
-  }, [chatDuration, frameRange, selectedTimestampNs]);
 
   const applyResponse = useCallback((
     response: SamplesResponse,
@@ -157,9 +118,6 @@ export function useSampleBrowser() {
     setLoadedRangeEndNs(null);
     setCanLoadMoreLeft(true);
     setCanLoadMoreRight(true);
-    setChatQuery("");
-    setChatResponse(null);
-    setChatDuration(DEFAULT_WINDOW_SECONDS);
     setIsLoadingSamples(true);
   }, []);
 
@@ -331,53 +289,19 @@ export function useSampleBrowser() {
     });
   }, [loadedRangeEndNs, loadedRangeStartNs, loadSamples, samples, selectedResult]);
 
-  const runChat = useCallback(async () => {
-    if (!selectedResult || selectedTimestampNs === null) return;
-    if (!chatQuery.trim()) {
-      toast.error("Enter a question for the Sample.");
-      return;
-    }
-    setIsChatting(true);
-    setChatResponse(null);
-    try {
-      const response = await chatWithClip({
-        bag_path: selectedResult.bag_path,
-        start_ns: vlmWindow?.startNs ?? selectedTimestampNs,
-        duration: chatDuration,
-        query: chatQuery.trim(),
-      });
-      setChatResponse(response.response);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Video chat failed.");
-    } finally {
-      setIsChatting(false);
-    }
-  }, [chatDuration, chatQuery, selectedResult, selectedTimestampNs, vlmWindow?.startNs]);
-
-  const isSampleInVlmWindow = useCallback((timestampNs: number) => {
-    if (!vlmWindow) return false;
-    return timestampNs >= vlmWindow.startNs && timestampNs <= vlmWindow.endNs;
-  }, [vlmWindow]);
-
   return {
     activeSample,
     anchorCamera,
     cameras,
     canLoadMoreLeft,
     canLoadMoreRight,
-    chatDuration,
-    chatQuery,
-    chatResponse,
-    isChatting,
     isExtendingLeft,
     isExtendingRight,
     isLoadingSamples,
-    isSampleInVlmWindow,
     jumpToTimestamp,
     loadMoreLeft,
     loadMoreRight,
     openForBag,
-    runChat,
     sampleToleranceNs,
     samples,
     selectNextSample,
@@ -385,10 +309,6 @@ export function useSampleBrowser() {
     selectedResult,
     selectedSampleIndex,
     selectedTimestampNs,
-    setChatDuration,
-    setChatQuery,
     setSelectedTimestampNs,
-    vlmWindowEndNs: vlmWindow?.endNs ?? null,
-    vlmWindowStartNs: vlmWindow?.startNs ?? null,
   };
 }

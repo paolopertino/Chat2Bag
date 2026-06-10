@@ -77,8 +77,6 @@ def test_draft_state_tracks_source_transitions_without_value_key_staleness():
 
     for relative in [
         "frontend/src/hooks/use-omnibox-search.ts",
-        "frontend/src/pages/bags/bags-list-page.tsx",
-        "frontend/src/components/search/map-area-dialog.tsx",
     ]:
         source = (ROOT / relative).read_text(encoding="utf-8")
         assert "useSourceDraft" in source

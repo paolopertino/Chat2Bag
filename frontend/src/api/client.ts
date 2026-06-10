@@ -1,6 +1,5 @@
 import type {
   Area,
-  ChatResponse,
   BagInfoResponse,
   BagStatusResponse,
   ExtractionConfigSchema,
@@ -34,13 +33,6 @@ interface SimilarSearchRequest {
 
 interface IndexRequest {
   bag_path: string;
-}
-
-interface ChatRequest {
-  bag_path: string;
-  start_ns: number;
-  duration: number;
-  query: string;
 }
 
 // ---- Auth integration (token injection + 401 refresh) ----
@@ -290,13 +282,6 @@ export async function searchByImage(
 
 export async function searchSimilar(payload: SimilarSearchRequest): Promise<SearchResponse> {
   return http<SearchResponse>("/api/search/similar", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function chatWithClip(payload: ChatRequest): Promise<ChatResponse> {
-  return http<ChatResponse>("/api/chat", {
     method: "POST",
     body: JSON.stringify(payload),
   });
