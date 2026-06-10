@@ -9,6 +9,7 @@ import { MapLibreMap } from "../components/map/maplibre-map";
 import { MapSidePanel } from "../components/map/map-side-panel";
 import { ResultPinsLayer } from "../components/map/result-pins-layer";
 import { ResultsRail } from "../components/search/results-rail";
+import { SampleResultLightbox } from "../components/search/sample-result-lightbox";
 import { encodeBagId } from "../lib/bag-id";
 import { useBagsState } from "../hooks/use-bags";
 import { useFleetTracks } from "../hooks/use-fleet-tracks";
@@ -22,6 +23,7 @@ export function MapHomePage() {
   const [hoveredBagPath, setHoveredBagPath] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState<"circle" | "polygon" | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const search = useOmniboxSearch();
 
   const openBag = (bagPath: string) => navigate(`/bags/${encodeBagId(bagPath)}`);
@@ -41,6 +43,8 @@ export function MapHomePage() {
       <Omnibox
         search={search}
         onStartAreaDraw={setDrawMode}
+        supportDialogOpen={supportDialogOpen}
+        onSupportDialogOpenChange={setSupportDialogOpen}
         className="absolute left-1/2 top-4 z-20 w-[min(760px,92vw)] -translate-x-1/2"
       />
       <ResultsRail
@@ -63,6 +67,26 @@ export function MapHomePage() {
         onOpenBag={openBag}
         jobsTab={null}
       />
+      {lightboxIndex !== null && search.results[lightboxIndex] ? (
+        <SampleResultLightbox
+          results={search.results}
+          index={lightboxIndex}
+          onIndexChange={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          fetchHeatmap={search.activeKind === "region" ? search.fetchHeatmap : undefined}
+          getResultHref={(r) => `/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`}
+          onUseAsRegionSupport={(r) => {
+            search.setSupport({ kind: "frame", filePath: r.file_path });
+            setSupportDialogOpen(true);
+            setLightboxIndex(null);
+          }}
+          onOpenInBag={(r) =>
+            navigate(`/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`, {
+              state: { results: search.results },
+            })
+          }
+        />
+      ) : null}
     </div>
   );
 }

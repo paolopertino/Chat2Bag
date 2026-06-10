@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Crosshair, ExternalLink, Flame, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Crosshair, Download, ExternalLink, Flame, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,6 +15,8 @@ interface SampleResultLightboxProps {
   fetchHeatmap?: (targetFilePath: string) => Promise<HeatmapResponse | null>;
   getResultHref: (result: SearchResult) => string;
   onUseAsRegionSupport: (result: SearchResult) => void;
+  onExtract?: (result: SearchResult) => void;
+  onOpenInBag?: (result: SearchResult) => void;
 }
 
 interface SampleLoadState {
@@ -54,6 +56,8 @@ export function SampleResultLightbox({
   fetchHeatmap,
   getResultHref,
   onUseAsRegionSupport,
+  onExtract,
+  onOpenInBag,
 }: SampleResultLightboxProps) {
   const result = results[index];
   const key = result ? resultKey(result) : "";
@@ -270,11 +274,26 @@ export function SampleResultLightbox({
         >
           <Crosshair className="h-3.5 w-3.5" /> Use as region support
         </button>
-        <Button asChild variant="secondary" size="sm">
-          <Link to={getResultHref(result)}>
+        {onExtract ? (
+          <button
+            type="button"
+            onClick={() => onExtract(result)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/30 px-3 py-1 text-xs hover:bg-white/10"
+          >
+            <Download className="h-3.5 w-3.5" /> Extract…
+          </button>
+        ) : null}
+        {onOpenInBag ? (
+          <Button variant="secondary" size="sm" onClick={() => onOpenInBag(result)}>
             <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Explorer
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button asChild variant="secondary" size="sm">
+            <Link to={getResultHref(result)}>
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Explorer
+            </Link>
+          </Button>
+        )}
         <span className="text-xs text-white/60">
           {index + 1} / {results.length}
         </span>

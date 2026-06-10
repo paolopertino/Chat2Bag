@@ -15,6 +15,9 @@ interface OmniboxProps {
   /** Hidden in the Bag viewer (scope is pinned). */
   showBagChip?: boolean;
   onStartAreaDraw?: (kind: "circle" | "polygon") => void;
+  /** Lifted state: controls the support dialog from outside (e.g. after "Use as region support"). */
+  supportDialogOpen?: boolean;
+  onSupportDialogOpenChange?: (open: boolean) => void;
   className?: string;
 }
 
@@ -23,9 +26,16 @@ export function Omnibox({
   showAreaChip = true,
   showBagChip = true,
   onStartAreaDraw,
+  supportDialogOpen: externalDialogOpen,
+  onSupportDialogOpenChange,
   className,
 }: OmniboxProps) {
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [internalDialogOpen, setInternalDialogOpen] = useState(false);
+  const dialogOpen = externalDialogOpen ?? internalDialogOpen;
+  const setDialogOpen = (open: boolean) => {
+    setInternalDialogOpen(open);
+    onSupportDialogOpenChange?.(open);
+  };
 
   // Convert SupportSource to the RegionSupportDialog's RegionSupport format
   function toRegionSupport(s: SupportSource | null): RegionSupport | null {
@@ -51,7 +61,7 @@ export function Omnibox({
             onClear={() => search.clear()}
             onImageUpload={(file) => {
               search.setSupport({ kind: "upload", file, objectUrl: URL.createObjectURL(file) });
-              setSupportDialogOpen(true);
+              setDialogOpen(true);
             }}
           />
         </div>
@@ -59,7 +69,7 @@ export function Omnibox({
         {search.support ? (
           <SupportChip
             pointCount={search.points.length}
-            onEdit={() => setSupportDialogOpen(true)}
+            onEdit={() => setDialogOpen(true)}
             onClear={() => search.setSupport(null)}
           />
         ) : (
@@ -118,14 +128,14 @@ export function Omnibox({
         />
       </div>
 
-      {supportDialogOpen && search.support ? (
+      {dialogOpen && search.support ? (
         <RegionSupportDialog
-          open={supportDialogOpen}
+          open={dialogOpen}
           support={toRegionSupport(search.support)}
           initialPoints={search.points}
-          onClose={() => setSupportDialogOpen(false)}
+          onClose={() => setDialogOpen(false)}
           onConfirm={(points) => {
-            setSupportDialogOpen(false);
+            setDialogOpen(false);
             search.submitSupportRegion(points);
           }}
         />
