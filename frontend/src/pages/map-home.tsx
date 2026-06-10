@@ -10,10 +10,12 @@ import { MapSidePanel } from "../components/map/map-side-panel";
 import { ResultPinsLayer } from "../components/map/result-pins-layer";
 import { ResultsRail } from "../components/search/results-rail";
 import { SampleResultLightbox } from "../components/search/sample-result-lightbox";
+import { ExtractDialog } from "../components/extract/extract-dialog";
 import { encodeBagId } from "../lib/bag-id";
 import { useBagsState } from "../hooks/use-bags";
 import { useFleetTracks } from "../hooks/use-fleet-tracks";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
+import type { SearchResult } from "../api/types";
 
 export function MapHomePage() {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ export function MapHomePage() {
   const [drawMode, setDrawMode] = useState<"circle" | "polygon" | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [extractTarget, setExtractTarget] = useState<SearchResult | null>(null);
   const search = useOmniboxSearch();
 
   const openBag = (bagPath: string) => navigate(`/bags/${encodeBagId(bagPath)}`);
@@ -80,11 +83,20 @@ export function MapHomePage() {
             setSupportDialogOpen(true);
             setLightboxIndex(null);
           }}
+          onExtract={setExtractTarget}
           onOpenInBag={(r) =>
             navigate(`/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`, {
               state: { results: search.results },
             })
           }
+        />
+      ) : null}
+      {extractTarget ? (
+        <ExtractDialog
+          bagPath={extractTarget.bag_path}
+          timestampNs={extractTarget.timestamp_ns}
+          open
+          onOpenChange={(o) => { if (!o) setExtractTarget(null); }}
         />
       ) : null}
     </div>

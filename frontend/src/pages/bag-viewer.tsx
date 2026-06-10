@@ -4,8 +4,12 @@ import { useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { getBagInfo } from "../api/client";
 import type { SearchResult } from "../api/types";
+import { ExtractDialog } from "../components/extract/extract-dialog";
+import { Omnibox } from "../components/omnibox/omnibox";
+import { ResultsRail } from "../components/search/results-rail";
 import { SampleGridViewer } from "../components/samples/sample-grid-viewer";
 import { TimelineBar } from "../components/samples/timeline-bar";
+import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import { useSampleBrowser } from "../hooks/use-sample-browser";
 import { decodeBagId } from "../lib/bag-id";
 
@@ -16,12 +20,15 @@ export function BagViewerPage() {
   const browser = useSampleBrowser();
   const [editMode, setEditMode] = useState(false);
   const [bagRange, setBagRange] = useState<{ first: number; last: number } | null>(null);
+  const [extractTimestampNs, setExtractTimestampNs] = useState<number | null>(null);
 
   const bagPath = useMemo(() => (bagId ? decodeBagId(bagId) : null), [bagId]);
   const bagName = bagPath ? bagPath.replace(/\/+$/, "").split("/").pop()! : "";
 
+  const search = useOmniboxSearch({ scope: { bagPaths: bagPath ? [bagPath] : [] } });
+
   const handedResults = (location.state as { results?: SearchResult[] } | null)?.results ?? [];
-  const pins = handedResults.filter((r) => r.bag_path === bagPath);
+  const pins = [...handedResults.filter((r) => r.bag_path === bagPath), ...search.results];
 
   useEffect(() => {
     if (!bagPath) return;
@@ -54,9 +61,25 @@ export function BagViewerPage() {
 
   return (
     <div className="absolute inset-0 flex flex-col gap-2 p-3">
-      <div className="flex items-center justify-between">
-        <h1 className="truncate text-sm font-semibold">{bagName}</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2">
+        <h1 className="shrink-0 truncate text-sm font-semibold">{bagName}</h1>
+        <Omnibox
+          search={search}
+          showAreaChip={false}
+          showBagChip={false}
+          className="w-[min(640px,80vw)]"
+        />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button
+            className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs"
+            onClick={() =>
+              setExtractTimestampNs(
+                browser.activeSample?.timestamp_ns ?? bagRange?.first ?? 0,
+              )
+            }
+          >
+            Extract…
+          </button>
           <button
             className={
               "flex items-center gap-1 rounded border px-2 py-1 text-xs " +
@@ -77,6 +100,20 @@ export function BagViewerPage() {
         />
       </div>
 
+      {search.results.length > 0 ? (
+        <ResultsRail
+          results={search.results}
+          selectedIndex={null}
+          onSelect={(i) => {
+            const r = search.results[i];
+            if (r) void browser.jumpToTimestamp(r.timestamp_ns);
+          }}
+          onLoadMore={search.loadMore}
+          isSearching={search.isSearching}
+          className="max-h-24"
+        />
+      ) : null}
+
       {bagRange ? (
         <TimelineBar
           samples={browser.samples}
@@ -93,6 +130,15 @@ export function BagViewerPage() {
           onLoadRight={() => void browser.loadMoreRight()}
           canLoadLeft={browser.canLoadMoreLeft}
           canLoadRight={browser.canLoadMoreRight}
+        />
+      ) : null}
+
+      {extractTimestampNs !== null && bagPath ? (
+        <ExtractDialog
+          bagPath={bagPath}
+          timestampNs={extractTimestampNs}
+          open
+          onOpenChange={(o) => { if (!o) setExtractTimestampNs(null); }}
         />
       ) : null}
     </div>
