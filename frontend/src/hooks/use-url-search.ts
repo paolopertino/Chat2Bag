@@ -8,10 +8,10 @@ import { decodeBagId } from "../lib/bag-id";
 import { decodeArea } from "../lib/area-codec";
 import type { Area } from "../api/types";
 
-const TOP_K_DEFAULT = 25;
+const TOP_K_DEFAULT = 100;
 const MIN_SCORE_DEFAULT = 0;
 const TOP_K_MIN = 1;
-const TOP_K_MAX = 100;
+const TOP_K_MAX = 500;
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi);
