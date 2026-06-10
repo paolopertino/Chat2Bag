@@ -8,7 +8,7 @@ interface ResultsGridProps {
   onResultClick?: (result: SearchResult) => void;
   onSimilarSearch?: (result: SearchResult) => void;
   onUseAsRegionSupport?: (result: SearchResult) => void;
-  /** When provided, each card renders as a `<Link>` enabling Cmd/Ctrl-click → new tab. */
+  /** Explicit Bag Explorer action for each result card. */
   getResultHref?: (result: SearchResult) => string;
 }
 
@@ -44,7 +44,7 @@ export function ResultsGrid({
         <ImageCard
           key={`${result.file_path}:${result.timestamp_ns}`}
           result={result}
-          href={getResultHref?.(result)}
+          explorerHref={getResultHref?.(result)}
           onClick={onResultClick ? () => onResultClick(result) : undefined}
           onSimilarSearch={onSimilarSearch}
           onUseAsRegionSupport={onUseAsRegionSupport}

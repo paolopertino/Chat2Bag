@@ -20,11 +20,22 @@ artifact of a Frame).
 One camera on the vehicle, identified by its ROS2 topic. A Bag carries several.
 _Avoid_: topic (that's the transport identifier for a Camera, not the concept).
 
+**Camera layout**:
+A user-defined spatial arrangement of Cameras for displaying a Sample. It
+describes where each Camera's Frame appears in the viewer; it does not affect
+indexing, ranking, or synchronization.
+_Avoid_: camera label, topic order.
+
+**Anchor Camera**:
+The Camera whose Frame timestamps define the Sample timeline when browsing a
+Bag. Other Cameras are joined to each Sample by nearest timestamp.
+_Avoid_: master camera, camera stream.
+
 **Sample**:
-The set of Frames from all Cameras captured at (approximately) the same instant
-— a synchronized grouping used for visualization (show the full rig around a
-hit) and, later, as the substrate for cross-camera Region search. Never a fused
-embedding.
+The synchronized grouping for one instant: at most one nearby Frame per Camera.
+Cameras with no nearby Frame are absent from that Sample. Used for visualization
+(show the full rig around a hit) and, later, as the substrate for cross-camera
+Region search. Never a fused embedding.
 _Avoid_: keyframe, snapshot.
 
 **Patch**:
@@ -97,7 +108,8 @@ _Avoid_: geo search, location search, area search (collides with Region).
 
 - A **Bag** carries several **Cameras**; each **Camera** yields many **Frames**
   (one per sampling tick).
-- A **Sample** groups one **Frame** per **Camera** at a single instant.
+- A **Sample** is anchored by one **Anchor Camera** timestamp and groups at
+  most one nearby **Frame** per **Camera**.
 - A **Frame** is divided into many **Patches**; **Region search** ranks a Frame
   by its single best-matching **Patch** against the query.
 - **Global search** and **Region search** rank the same **Frames** by different

@@ -1,7 +1,7 @@
 ingestion:
   camera_topics:                                                                            # List of ROS2 camera topics to extract frames from (per-camera Frames; no multi-view fusion).
-    - "/lucid_vision/lucid_cam_front_left/image_rect/compressed"
     - "/lucid_vision/lucid_cam_front_center/image_rect/compressed"
+    - "/lucid_vision/lucid_cam_front_left/image_rect/compressed"
     - "/lucid_vision/lucid_cam_front_right/image_rect/compressed"
   sampling_fps: 1.0                                                                          # Subsampling rate per camera: 1.0 means 1 frame per second per topic.
   long_side: 840                                                                             # Aspect-preserving long-edge budget for stored thumbnails (configurable; tune during testing). 840 = 60*14.

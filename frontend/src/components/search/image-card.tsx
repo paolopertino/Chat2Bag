@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Crosshair, Search } from "lucide-react";
+import { Crosshair, ExternalLink, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import type { SearchResult } from "../../api/types";
@@ -16,13 +16,21 @@ interface ImageCardProps {
   result: SearchResult;
   /** When provided, renders the image area as a `<Link>` so Cmd/Ctrl-click opens a new tab. */
   href?: string;
+  explorerHref?: string;
   onClick?: () => void;
   onSimilarSearch?: (result: SearchResult) => void;
   /** Region mode: promote this frame to a region support image. */
   onUseAsRegionSupport?: (result: SearchResult) => void;
 }
 
-export function ImageCard({ result, href, onClick, onSimilarSearch, onUseAsRegionSupport }: ImageCardProps) {
+export function ImageCard({
+  result,
+  href,
+  explorerHref,
+  onClick,
+  onSimilarSearch,
+  onUseAsRegionSupport,
+}: ImageCardProps) {
   const filePath = result.file_path;
   const [hasImageError, setHasImageError] = useState(false);
   const handleImageError = useCallback(() => setHasImageError(true), []);
@@ -61,6 +69,20 @@ export function ImageCard({ result, href, onClick, onSimilarSearch, onUseAsRegio
             <p className="font-mono text-xs text-[var(--ink-soft)]">t = {formatTimestampNs(result.timestamp_ns)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {explorerHref ? (
+              <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                <Link
+                  to={explorerHref}
+                  title="Open in Explorer"
+                  aria-label="Open in Explorer"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
             {onUseAsRegionSupport ? (
               <Button
                 type="button"
