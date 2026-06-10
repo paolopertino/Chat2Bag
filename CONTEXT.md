@@ -104,6 +104,44 @@ ranks. The user's mental model is "look only here." Defined through a
 full-screen map (click a point, or draw an Area).
 _Avoid_: geo search, location search, area search (collides with Region).
 
+### Surfaces
+
+**Map home**:
+The landing surface after login — a world map carrying every Bag's Track,
+where all cross-bag querying happens.
+_Avoid_: dashboard, search page, workspace.
+
+**Bag viewer**:
+The surface for navigating a single Bag — its Camera layout plus its timeline.
+_Avoid_: sequence viewer, explorer.
+
+**Omnibox**:
+The single query control; the kind of search it runs is implied by what the
+user attaches (text, image, points, Area), never by a mode picker.
+_Avoid_: search bar, mode toggle.
+
+**Results rail**:
+The strip of ranked hits for the current query — every hit appears here,
+located or not.
+_Avoid_: results grid, list.
+
+**Pin**:
+A clickable marker for one hit — placed on the map by Frame location, or on a
+timeline by timestamp.
+_Avoid_: marker, dot.
+
+**Lightbox**:
+The overlay showing the full Sample around one hit for quick inspection
+without leaving the query.
+_Avoid_: preview, modal, popup.
+
+### Jobs
+
+**Extraction**:
+An exported window of Frames from one Bag starting at a chosen instant,
+produced by a background job.
+_Avoid_: dataset (the old route name), export.
+
 ## Relationships
 
 - A **Bag** carries several **Cameras**; each **Camera** yields many **Frames**
@@ -122,6 +160,12 @@ _Avoid_: geo search, location search, area search (collides with Region).
 - An **Area** filters **Frames** by **Frame location**; **Map search** composes
   with **Global** or **Region search** (filter ∩ ranked query) or stands alone
   as a geographic browse.
+- The **Map home** queries **Frames** across all **Bags**; the **Bag viewer**
+  navigates one **Bag**'s **Samples**.
+- Every hit lands in the **Results rail**; only hits with a **Frame location**
+  also get a map **Pin**.
+- An **Extraction** exports a contiguous window of **Frames** from exactly one
+  **Bag**.
 
 ## Flagged ambiguities
 

@@ -29,14 +29,15 @@ React Router v6 shell built during the Phase 1 refactor:
 
 ## Refactoring Roadmap
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Auth (JWT + SQLite) + router scaffold + layout | ✅ Done on branch `frontend-refactor` |
-| 2 | `/bags` — carve bag scanning, bag list, sequence viewer out of WorkspacePage | ⬜ Not started — no spec/plan yet |
-| 3 | `/search` — carve search bar + results grid out of WorkspacePage | ⬜ Not started |
-| 4 | `/datasets` — dataset extraction / jobs UI | ⬜ Not started |
-
-When Phase 4 is done, delete `/workspace` and `WorkspacePage`. Design spec for Phase 1 lives at `docs/superpowers/specs/2026-04-23-auth-routing-scaffold-design.md` — reference it for the routing patterns Phases 2–4 must follow.
+The phased WorkspacePage carve-out (old Phases 2–4) is **superseded** by the
+map-first frontend redesign: two surfaces only — `/` (Map home: MapLibre map +
+Omnibox + side panel + Results rail) and `/bags/:bagId` (Bag viewer: free
+snap-grid Camera layout + timeline). VLM chat gets no UI. Design spec:
+`docs/superpowers/specs/2026-06-10-frontend-redesign-design.md`; build order is
+sketched at the bottom of that spec. Legacy pages (`/workspace`, dashboard,
+`/search`, `/bags` list, `/datasets` stub) are deleted as part of that effort.
+Surface vocabulary (Map home, Omnibox, Results rail, Pin, Lightbox, Extraction)
+is canonicalized in `CONTEXT.md`.
 
 ## Development Standards
 
@@ -123,15 +124,15 @@ Indexing produces per-bag artifacts stored alongside the bag or in a custom dire
 - `.bag_chat/metadata.json` - bag metadata
 - `.bag_chat/lancedb/` - vector index
 
-## Next Step (Phase 2)
+## Next Step
 
-Before touching code, produce a design spec + implementation plan for the `/bags` Bag Explorer page. Suggested flow:
-1. `/brainstorm` — explore layout, component decomposition, URL structure (list vs. detail), how `useSidebar` is shared across routes
-2. Save spec to `docs/superpowers/specs/YYYY-MM-DD-bag-explorer-design.md`
-3. `/plan` — write step-by-step plan to `docs/superpowers/plans/YYYY-MM-DD-bag-explorer.md`
-4. Execute via `superpowers:subagent-driven-development` or `superpowers:executing-plans`
-
-Phase 2 MUST preserve `/workspace` as a working fallback until Phase 4 completes — extract by copying components to a new route, not by moving them.
+Implement the map-first redesign. Spec is approved at
+`docs/superpowers/specs/2026-06-10-frontend-redesign-design.md`; next action is
+a step-by-step implementation plan in
+`docs/superpowers/plans/2026-06-10-frontend-redesign.md` following the spec's
+build-order sketch (backend first: batch tracks endpoint, Frame location in
+search responses, top_k default, `/api/image` auth). Unlike the old roadmap,
+legacy pages are deleted in this effort — no `/workspace` fallback is kept.
 
 ---
-**Last Updated**: 2026-04-24 (Phase 1 shipped on `frontend-refactor`; Phase 2 pending spec)
+**Last Updated**: 2026-06-10 (map-first redesign spec approved; implementation pending)
