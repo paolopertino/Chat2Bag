@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { getSamples } from "../../api/client";
 import type { HeatmapResponse, SampleInfo, SearchResult } from "../../api/types";
-import { SampleViewer } from "../samples/sample-viewer";
+import { SampleGridViewer } from "../samples/sample-grid-viewer";
 import { Button } from "../ui/button";
 
 interface SampleResultLightboxProps {
@@ -212,16 +212,21 @@ export function SampleResultLightbox({
         </button>
 
         <div className="min-h-0 flex-1">
-          <SampleViewer
-            cameras={cameras}
-            sample={sample}
-            isLoading={isLoadingSample}
-            heatmaps={heatmaps}
-            heatmapLoading={heatmapLoading}
-            showHeatmaps={canShowHeatmaps && showHeatmaps}
-            heatmapOpacity={opacity}
-            className="h-full rounded-md"
-          />
+          {isLoadingSample ? (
+            <div className="flex min-h-[320px] items-center justify-center bg-black rounded-md">
+              <span className="text-xs text-white/60">Loading…</span>
+            </div>
+          ) : (
+            <SampleGridViewer
+              cameras={cameras}
+              sample={sample}
+              editMode={false}
+              heatmaps={heatmaps}
+              showHeatmaps={canShowHeatmaps && showHeatmaps}
+              heatmapOpacity={opacity}
+              className="h-full rounded-md"
+            />
+          )}
           {activeSampleState?.error ? (
             <p className="mt-2 text-center text-xs text-white/70">{activeSampleState.error}</p>
           ) : null}
