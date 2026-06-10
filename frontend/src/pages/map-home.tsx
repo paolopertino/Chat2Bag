@@ -11,6 +11,7 @@ import { ResultPinsLayer } from "../components/map/result-pins-layer";
 import { ResultsRail } from "../components/search/results-rail";
 import { SampleResultLightbox } from "../components/search/sample-result-lightbox";
 import { ExtractDialog } from "../components/extract/extract-dialog";
+import { JobsTab } from "../components/map/jobs-tab";
 import { encodeBagId } from "../lib/bag-id";
 import { useBagsState } from "../hooks/use-bags";
 import { useFleetTracks } from "../hooks/use-fleet-tracks";
@@ -68,7 +69,7 @@ export function MapHomePage() {
         onIndex={bagsState.onIndex}
         onHoverBag={setHoveredBagPath}
         onOpenBag={openBag}
-        jobsTab={null}
+        jobsTab={<JobsTab />}
       />
       {lightboxIndex !== null && search.results[lightboxIndex] ? (
         <SampleResultLightbox
