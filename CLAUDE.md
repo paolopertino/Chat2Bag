@@ -20,24 +20,33 @@ Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLi
 
 ## Frontend Structure
 
-React Router v6 shell built during the Phase 1 refactor:
+Two-surface map-first UI (shipped 2026-06-10):
+
 - `AuthProvider` (silent refresh on mount) wraps `<RouterProvider>`
 - `ProtectedRoute` redirects to `/login` when unauthenticated
-- `MainLayout` (top bar + optional sidebar slot) wraps the dashboard and feature pages
-- Routes: `/login`, `/` (Dashboard), `/workspace` (legacy all-in-one UI, temporary), `/bags/*` and `/datasets/*` stubs
-- `useSidebar(render, deps)` hook: pages inject their sidebar via a render factory + explicit deps (NOT inline JSX — that triggered React #185)
+- `FullBleedLayout` (TopBar only, no sidebar) wraps both surfaces
+- Routes: `/login`, `/` (Map home), `/bags/:bagId` (Bag viewer), `*` → redirect `/`
 
-## Refactoring Roadmap
+**Map home (`/`):** MapLibre GL globe (OpenFreeMap tiles) + `FleetTracksLayer` (colored GPS tracks per indexed bag) + `AreaDraw`/`AreaDisplayLayer` (terra-draw polygon/circle filter) + `Omnibox` (centered pill bar: text/image/region/area/bag/top-k chips) + `MapSidePanel` (Bags tab + Jobs tab) + `ResultsRail` (horizontal thumbnail strip) + `ResultPinsLayer` (clustered orange dots) + `SampleResultLightbox` (full Sample view with heatmap, use-as-support, open-in-bag, extract actions)
 
-The phased WorkspacePage carve-out (old Phases 2–4) is **superseded** by the
-map-first frontend redesign: two surfaces only — `/` (Map home: MapLibre map +
-Omnibox + side panel + Results rail) and `/bags/:bagId` (Bag viewer: free
-snap-grid Camera layout + timeline). VLM chat gets no UI. Design spec:
-`docs/superpowers/specs/2026-06-10-frontend-redesign-design.md`; build order is
-sketched at the bottom of that spec. Legacy pages (`/workspace`, dashboard,
-`/search`, `/bags` list, `/datasets` stub) are deleted as part of that effort.
-Surface vocabulary (Map home, Omnibox, Results rail, Pin, Lightbox, Extraction)
-is canonicalized in `CONTEXT.md`.
+**Bag viewer (`/bags/:bagId`):** `SampleGridViewer` (react-grid-layout snap-grid, 12-column, `editMode` drag/resize persisted to localStorage via `readCameraLayoutV2`/`saveCameraLayoutV2`) + `TimelineBar` (normalized axis, amber pins for search hits, ← / → load more) + scoped `Omnibox` (showAreaChip=false, showBagChip=false) + `ExtractDialog`
+
+**Key components:**
+- `frontend/src/components/map/` — MapLibre wrappers (`maplibre-map.tsx`, `fleet-tracks-layer.tsx`, `area-draw.tsx`, `area-display-layer.tsx`, `result-pins-layer.tsx`, `map-side-panel.tsx`, `jobs-tab.tsx`)
+- `frontend/src/components/omnibox/` — `omnibox.tsx`, `support-chip.tsx`
+- `frontend/src/components/search/` — `results-rail.tsx`, `sample-result-lightbox.tsx`, `region-support-dialog.tsx`, `heatmap-overlay.tsx`, and chip components
+- `frontend/src/components/samples/` — `sample-grid-viewer.tsx`, `timeline-bar.tsx`
+- `frontend/src/components/extract/` — `extract-dialog.tsx`
+- `frontend/src/hooks/` — `use-omnibox-search.ts` (orchestrates url+region+area search), `use-fleet-tracks.ts`, `use-sample-browser.ts`, `use-url-search.ts`, `use-region-search.ts`, `use-map-area.ts`, `use-source-draft.ts`
+- `frontend/src/lib/` — `sample-camera-layout.ts` (v2 snap-grid layout; v1 types kept for migration), `bag-id.ts` (URL-safe base64 for bag paths), `area-codec.ts`, `rgl-compat.ts` (react-grid-layout CJS shim)
+
+**CSS variables:** `--surface` (panel/card backgrounds), `--line` (borders), `--ink` (text), `--ink-soft`, `--canvas` (page background). Use `--surface` not `--panel`.
+
+**Layout persistence:** `readCameraLayoutV2(cameras)` / `saveCameraLayoutV2(layout)` — keyed by sorted camera list, localStorage; migrates v1 layouts; seeds from best-overlap saved layout for new camera sets.
+
+## Status
+
+Map-first redesign **shipped** on `feat/frontend-refactor` (2026-06-10). All 20 implementation tasks complete. Legacy pages (`/workspace`, dashboard, `/search`, bags list, detail page), `MainLayout`, Leaflet stack, and chat UI have been deleted.
 
 ## Development Standards
 
@@ -124,15 +133,5 @@ Indexing produces per-bag artifacts stored alongside the bag or in a custom dire
 - `.bag_chat/metadata.json` - bag metadata
 - `.bag_chat/lancedb/` - vector index
 
-## Next Step
-
-Implement the map-first redesign. Spec is approved at
-`docs/superpowers/specs/2026-06-10-frontend-redesign-design.md`; next action is
-a step-by-step implementation plan in
-`docs/superpowers/plans/2026-06-10-frontend-redesign.md` following the spec's
-build-order sketch (backend first: batch tracks endpoint, Frame location in
-search responses, top_k default, `/api/image` auth). Unlike the old roadmap,
-legacy pages are deleted in this effort — no `/workspace` fallback is kept.
-
 ---
-**Last Updated**: 2026-06-10 (map-first redesign spec approved; implementation pending)
+**Last Updated**: 2026-06-10 (map-first redesign shipped)
