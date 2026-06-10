@@ -12,7 +12,7 @@ from src.auth.dependencies import require_current_user
 from src.core.app_config import get_app_config
 from src.core.index_stamp import gps_is_located, read_gps_stamp
 from src.core.settings import get_settings
-from src.core.storage import resolve_artifact_path
+from src.core.storage import metadata_path_for_bag, resolve_artifact_path
 from src.services.sample_service import FocusFrameNotFound, build_samples_response
 
 router = APIRouter(
@@ -30,8 +30,7 @@ def _artifact_dir_for_bag(path: Path) -> Path:
     return resolve_artifact_path(bag_path=path)
 
 
-def _metadata_path_for_bag(path: Path) -> Path:
-    return _artifact_dir_for_bag(path) / "metadata.json"
+_metadata_path_for_bag = metadata_path_for_bag
 
 
 def _is_bag_dir(path: Path) -> bool:
