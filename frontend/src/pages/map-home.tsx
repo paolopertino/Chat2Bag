@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Omnibox } from "../components/omnibox/omnibox";
+import { AreaDraw } from "../components/map/area-draw";
+import { AreaDisplayLayer } from "../components/map/area-display-layer";
 import { FleetTracksLayer } from "../components/map/fleet-tracks-layer";
 import { MapLibreMap } from "../components/map/maplibre-map";
 import { MapSidePanel } from "../components/map/map-side-panel";
@@ -19,8 +21,6 @@ export function MapHomePage() {
   const [drawMode, setDrawMode] = useState<"circle" | "polygon" | null>(null);
   const search = useOmniboxSearch();
 
-  void drawMode; // wired to AreaDraw in Task 11
-
   const openBag = (bagPath: string) => navigate(`/bags/${encodeBagId(bagPath)}`);
 
   return (
@@ -31,6 +31,8 @@ export function MapHomePage() {
           hoveredBagPath={hoveredBagPath}
           onTrackClick={openBag}
         />
+        <AreaDraw mode={drawMode} onArea={search.setArea} onDone={() => setDrawMode(null)} />
+        <AreaDisplayLayer area={search.area} />
       </MapLibreMap>
       <Omnibox
         search={search}
