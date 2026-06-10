@@ -1,10 +1,10 @@
 import { LoaderCircle, Search } from "lucide-react";
-import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { BagTree } from "../../components/bags/bag-tree";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { useSourceDraft } from "../../hooks/use-source-draft";
 import type { BagsOutletContext } from "./bags-layout";
 
 export function BagsListPage() {
@@ -18,9 +18,7 @@ export function BagsListPage() {
     onIndex,
   } = useOutletContext<BagsOutletContext>();
 
-  const [draftState, setDraftState] = useState(() => ({ rootDir, value: rootDir }));
-  const draft = draftState.rootDir === rootDir ? draftState.value : rootDir;
-  const setDraft = (value: string) => setDraftState({ rootDir, value });
+  const [draft, setDraft] = useSourceDraft(rootDir);
 
   const submit = () => {
     const trimmed = draft.trim();

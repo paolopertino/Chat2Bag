@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Area, Point, SearchResult } from "../api/types";
 import { useMapArea } from "./use-map-area";
 import { useRegionSearch } from "./use-region-search";
+import { useSourceDraft } from "./use-source-draft";
 import { useUrlSearch } from "./use-url-search";
 
 export type SupportSource =
@@ -46,16 +47,11 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   const url = useUrlSearch({ scope: options?.scope, topKDefault: 100 });
   const region = useRegionSearch();
   const { area, setArea } = useMapArea();
-  const [textDraft, setTextDraft] = useState(() => ({ sourceQ: url.q, value: url.q }));
+  const [text, setText] = useSourceDraft(url.q);
   const [regionMode, setRegionMode] = useState(false);
   const [support, setSupportState] = useState<SupportSource | null>(null);
   const supportRef = useRef<SupportSource | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
-  const text = textDraft.sourceQ === url.q ? textDraft.value : url.q;
-  const setText = useCallback(
-    (next: string) => setTextDraft({ sourceQ: url.q, value: next }),
-    [url.q],
-  );
 
   const setSupport = useCallback((next: SupportSource | null, nextPoints: Point[] = []) => {
     const previous = supportRef.current;

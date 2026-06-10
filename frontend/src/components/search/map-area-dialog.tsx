@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 import type { Area, TrackPoint } from "../../api/types";
 import { countInArea } from "../../lib/area-geo";
+import { useSourceDraft } from "../../hooks/use-source-draft";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { AreaLayer } from "../map/area-layer";
@@ -22,12 +22,7 @@ interface MapAreaDialogProps {
 
 export function MapAreaDialog({ open, initialArea, tracks, onClose, onConfirm }: MapAreaDialogProps) {
   const draftSourceKey = `${open}:${JSON.stringify(initialArea)}`;
-  const [draftState, setDraftState] = useState(() => ({
-    sourceKey: draftSourceKey,
-    value: initialArea,
-  }));
-  const draft = draftState.sourceKey === draftSourceKey ? draftState.value : initialArea;
-  const setDraft = (value: Area | null) => setDraftState({ sourceKey: draftSourceKey, value });
+  const [draft, setDraft] = useSourceDraft<Area | null>(initialArea, draftSourceKey);
 
   const count = draft ? countInArea(draft, tracks) : null;
   const center = tracks[0]?.[0] ? [tracks[0][0].lat, tracks[0][0].lon] as [number, number] : DEFAULT_CENTER;

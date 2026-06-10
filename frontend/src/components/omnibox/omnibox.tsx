@@ -6,6 +6,7 @@ import { BagPickerChip } from "../search/bag-picker-chip";
 import { FilterChip } from "../search/filter-chip";
 import { RegionSupportDialog, type RegionSupport } from "../search/region-support-dialog";
 import { SearchInput } from "../search/search-input";
+import { SupportChip } from "./support-chip";
 
 interface OmniboxProps {
   search: OmniboxSearch;
@@ -56,20 +57,11 @@ export function Omnibox({
         </div>
 
         {search.support ? (
-          <button
-            className="flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-400/10 px-2 py-0.5 text-xs"
-            onClick={() => setSupportDialogOpen(true)}
-            title="Edit Region points"
-          >
-            support · {search.points.length} pts
-            <X
-              className="h-3 w-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                search.setSupport(null);
-              }}
-            />
-          </button>
+          <SupportChip
+            pointCount={search.points.length}
+            onEdit={() => setSupportDialogOpen(true)}
+            onClear={() => search.setSupport(null)}
+          />
         ) : (
           <button
             className={

@@ -63,3 +63,41 @@ def test_search_input_allows_explicit_non_text_submit_enablement():
     assert "canSubmit?: boolean;" in source
     assert "const submitEnabled = canSubmit ?? Boolean(value.trim());" in source
     assert "disabled={disabled || !submitEnabled}" in source
+
+
+def test_draft_state_tracks_source_transitions_without_value_key_staleness():
+    helper = ROOT / "frontend" / "src" / "hooks" / "use-source-draft.ts"
+    assert helper.exists()
+    helper_source = helper.read_text(encoding="utf-8")
+
+    assert "sourceRevision: draft.sourceRevision + 1" in helper_source
+    assert "if (sourceChanged) {" in helper_source
+    assert "setDraftState(nextDraft);" in helper_source
+    assert "useRef" not in helper_source
+
+    for relative in [
+        "frontend/src/hooks/use-omnibox-search.ts",
+        "frontend/src/pages/bags/bags-list-page.tsx",
+        "frontend/src/components/search/map-area-dialog.tsx",
+    ]:
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert "useSourceDraft" in source
+        assert ".sourceQ ===" not in source
+        assert ".sourceKey ===" not in source
+
+
+def test_omnibox_support_chip_is_extracted():
+    support_chip = ROOT / "frontend" / "src" / "components" / "omnibox" / "support-chip.tsx"
+    omnibox = (
+        ROOT
+        / "frontend"
+        / "src"
+        / "components"
+        / "omnibox"
+        / "omnibox.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert support_chip.exists()
+    support_source = support_chip.read_text(encoding="utf-8")
+    assert "export function SupportChip" in support_source
+    assert 'from "./support-chip"' in omnibox
