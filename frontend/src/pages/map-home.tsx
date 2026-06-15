@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { X } from "lucide-react";
 
 import { Omnibox } from "../components/omnibox/omnibox";
 import { AreaDraw } from "../components/map/area-draw";
@@ -31,6 +32,17 @@ export function MapHomePage() {
   const [extractTarget, setExtractTarget] = useState<SearchResult | null>(null);
   const [trackPreview, setTrackPreview] = useState<SearchResult | null>(null);
   const search = useOmniboxSearch();
+
+  // Esc exits an armed draw tool entirely (terra-draw's own Esc only clears the
+  // in-progress geometry but stays in the mode).
+  useEffect(() => {
+    if (!drawMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawMode(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawMode]);
 
   const openBag = (bagPath: string, timestampNs?: number) =>
     navigate(`/bags/${encodeBagId(bagPath)}${timestampNs != null ? `?t=${timestampNs}` : ""}`);
@@ -65,10 +77,27 @@ export function MapHomePage() {
       <Omnibox
         search={search}
         onStartAreaDraw={setDrawMode}
+        drawMode={drawMode}
         supportDialogOpen={supportDialogOpen}
         onSupportDialogOpenChange={setSupportDialogOpen}
         className="absolute left-1/2 top-4 z-20 w-[min(1080px,94vw)] -translate-x-1/2"
       />
+      {drawMode ? (
+        <div className="absolute left-1/2 top-20 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-sky-400/40 bg-[var(--glass)] px-4 py-1.5 text-xs shadow-lg backdrop-blur">
+          <span className="text-[var(--ink)]">
+            {drawMode === "circle"
+              ? "Click to place the center, then click again to set the radius."
+              : "Click to add points; click the first point or press Enter to finish."}
+          </span>
+          <button
+            onClick={() => setDrawMode(null)}
+            className="flex items-center gap-1 text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            title="Cancel drawing (Esc)"
+          >
+            <X className="h-3 w-3" /> cancel
+          </button>
+        </div>
+      ) : null}
       <ResultsRail
         results={search.results}
         selectedIndex={lightboxIndex}

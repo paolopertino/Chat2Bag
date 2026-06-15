@@ -1,4 +1,4 @@
-import { Crosshair, MapPinned, X } from "lucide-react";
+import { Crosshair } from "lucide-react";
 import { useState } from "react";
 
 import type { OmniboxSearch, SupportSource } from "../../hooks/use-omnibox-search";
@@ -6,6 +6,7 @@ import { BagPickerChip } from "../search/bag-picker-chip";
 import { FilterChip } from "../search/filter-chip";
 import { RegionSupportDialog, type RegionSupport } from "../search/region-support-dialog";
 import { SearchInput } from "../search/search-input";
+import { AreaDrawChip } from "./area-draw-chip";
 import { SupportChip } from "./support-chip";
 
 interface OmniboxProps {
@@ -15,6 +16,8 @@ interface OmniboxProps {
   /** Hidden in the Bag viewer (scope is pinned). */
   showBagChip?: boolean;
   onStartAreaDraw?: (kind: "circle" | "polygon") => void;
+  /** The draw tool currently armed (drives the Area chip's "drawing…" state). */
+  drawMode?: "circle" | "polygon" | null;
   /** Lifted state: controls the support dialog from outside (e.g. after "Use as region support"). */
   supportDialogOpen?: boolean;
   onSupportDialogOpenChange?: (open: boolean) => void;
@@ -26,6 +29,7 @@ export function Omnibox({
   showAreaChip = true,
   showBagChip = true,
   onStartAreaDraw,
+  drawMode = null,
   supportDialogOpen: externalDialogOpen,
   onSupportDialogOpenChange,
   className,
@@ -88,27 +92,12 @@ export function Omnibox({
         )}
 
         {showAreaChip ? (
-          search.area ? (
-            <button
-              className="flex items-center gap-1 rounded-full border border-emerald-400/70 bg-emerald-400/15 px-2 py-0.5 text-xs"
-              onClick={() => search.setArea(null)}
-              title="Clear Area"
-            >
-              <MapPinned className="h-3 w-3" /> area <X className="h-3 w-3" />
-            </button>
-          ) : (
-            <button
-              className="flex items-center gap-1 rounded-full border border-[var(--line)] px-2 py-0.5 text-xs opacity-60"
-              onClick={() => onStartAreaDraw?.("polygon")}
-              title="Draw an Area on the map (right-click for circle)"
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onStartAreaDraw?.("circle");
-              }}
-            >
-              <MapPinned className="h-3 w-3" /> area
-            </button>
-          )
+          <AreaDrawChip
+            area={search.area}
+            drawing={drawMode !== null}
+            onClear={() => search.setArea(null)}
+            onStartDraw={(kind) => onStartAreaDraw?.(kind)}
+          />
         ) : null}
 
         {showBagChip ? (
