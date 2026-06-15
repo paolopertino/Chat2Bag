@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.state import indexing_status
+from src.api.state import indexing_errors, indexing_status
 from src.auth.dependencies import require_current_user
 from src.core.app_config import get_app_config
 from src.core.index_stamp import gps_is_located, read_gps_stamp
@@ -102,6 +102,7 @@ async def scan_bags(
                 "status": indexing_status.get(bag_path, "idle"),
                 "is_located": gps_is_located(stamp),
                 "located_frame_count": int(stamp.get("located_frame_count", 0)) if stamp else 0,
+                "error_message": indexing_errors.get(bag_path),
             }
         )
 
@@ -123,7 +124,11 @@ async def bag_status(
     if status is None:
         status = "done" if lancedb_dir.exists() and lancedb_dir.is_dir() else "idle"
 
-    return {"bag_path": resolved_path, "status": status}
+    return {
+        "bag_path": resolved_path,
+        "status": status,
+        "error_message": indexing_errors.get(resolved_path),
+    }
 
 
 @router.get("/info")

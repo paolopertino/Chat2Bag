@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Request
 
-from src.api.state import indexing_status
+from src.api.state import indexing_errors, indexing_status
 from src.services.chat_service import ChatService
 from src.services.extraction_service import ExtractionService
 from src.services.indexing_service import IndexingService
@@ -15,6 +15,7 @@ def get_indexing_service(request: Request) -> IndexingService:
         status_store=indexing_status,
         searcher=request.app.state.searcher_instance,
         region_searcher=getattr(request.app.state, "region_searcher_instance", None),
+        error_store=indexing_errors,
     )
 
 
