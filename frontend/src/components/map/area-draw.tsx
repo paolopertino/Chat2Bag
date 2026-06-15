@@ -67,7 +67,18 @@ export function AreaDraw({ mode, onArea, onDone }: AreaDrawProps) {
     });
     return () => {
       cancelled = true;
-      if (draw) draw.stop();
+      // Navigating away unmounts both this component and <MapLibreMap>, which
+      // calls map.remove(). If the map is torn down first, terra-draw's stop()
+      // reaches into the dead map (getSource on an undefined style) and throws,
+      // crashing the route. The map's removal disposes terra-draw's own
+      // sources/layers anyway, so a teardown failure here is safe to ignore.
+      if (draw) {
+        try {
+          draw.stop();
+        } catch {
+          /* map already removed — terra-draw teardown is moot */
+        }
+      }
       drawRef.current = null;
     };
   }, [map]);

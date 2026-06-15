@@ -7,9 +7,11 @@ interface AuthImageProps {
   alt: string;
   className?: string;
   onError?: () => void;
+  /** Reports the frame's intrinsic aspect ratio (naturalWidth / naturalHeight) once it loads. */
+  onNaturalAspect?: (aspect: number) => void;
 }
 
-export function AuthImage({ filePath, alt, className, onError }: AuthImageProps) {
+export function AuthImage({ filePath, alt, className, onError, onNaturalAspect }: AuthImageProps) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,5 +43,17 @@ export function AuthImage({ filePath, alt, className, onError }: AuthImageProps)
     return <div className={className} />;
   }
 
-  return <img src={objectUrl} alt={alt} className={className} />;
+  return (
+    <img
+      src={objectUrl}
+      alt={alt}
+      className={className}
+      onLoad={(event) => {
+        const img = event.currentTarget;
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          onNaturalAspect?.(img.naturalWidth / img.naturalHeight);
+        }
+      }}
+    />
+  );
 }

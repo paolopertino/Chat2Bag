@@ -14,6 +14,20 @@
   --coral: #f26a4b;
   --teal: #2d7f85;
 
+  /* Map-first UI tokens (referenced as var(--surface)/var(--canvas) across
+     components). The *-rgb variants hold raw channels because Tailwind v3
+     cannot apply /NN opacity modifiers to var() colors — translucent fills
+     must be written as bg-[rgb(var(--surface-rgb)/0.95)]. */
+  --surface: #fffdf9;          /* = bg-paper; panels, cards, controls */
+  --surface-rgb: 255 253 249;
+  --canvas: #faf6ed;           /* = bg-sand; page background */
+  --teal-rgb: 45 127 133;
+
+  /* Frosted-glass fill for floating map panels (use with backdrop-blur).
+     The alpha must keep --ink text readable over dark satellite imagery
+     while staying translucent enough to read as glass over the street map. */
+  --glass: rgb(var(--surface-rgb) / 0.65);
+
   /* shadcn semantic tokens — mapped to project design identity.
      Values are raw HSL channels (no hsl() wrapper; Tailwind adds it). */
   --background: 42 50% 97%;        /* ≈ #faf6ed  (bg-sand)   */

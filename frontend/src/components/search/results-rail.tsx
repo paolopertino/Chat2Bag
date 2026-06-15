@@ -51,7 +51,7 @@ export function ResultsRail({
   return (
     <div
       className={
-        "flex items-stretch gap-2 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]/95 p-2 shadow-lg backdrop-blur " +
+        "flex items-stretch gap-2 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--glass)] p-2 shadow-lg backdrop-blur " +
         (className ?? "")
       }
     >

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Omnibox } from "../components/omnibox/omnibox";
 import { AreaDraw } from "../components/map/area-draw";
+import { BasemapToggle } from "../components/map/basemap-toggle";
 import { AreaDisplayLayer } from "../components/map/area-display-layer";
 import { FleetTracksLayer } from "../components/map/fleet-tracks-layer";
 import { MapLibreMap } from "../components/map/maplibre-map";
@@ -28,9 +29,25 @@ export function MapHomePage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [extractTarget, setExtractTarget] = useState<SearchResult | null>(null);
+  const [trackPreview, setTrackPreview] = useState<SearchResult | null>(null);
   const search = useOmniboxSearch();
 
-  const openBag = (bagPath: string) => navigate(`/bags/${encodeBagId(bagPath)}`);
+  const openBag = (bagPath: string, timestampNs?: number) =>
+    navigate(`/bags/${encodeBagId(bagPath)}${timestampNs != null ? `?t=${timestampNs}` : ""}`);
+
+  // Clicking a track previews the nearest point in the lightbox (rather than
+  // jumping straight into the bag viewer); the lightbox's "Open in Explorer"
+  // then enters the bag viewer at that timestamp.
+  const openTrackPreview = (bagPath: string, timestampNs?: number) => {
+    const bagName = bagPath.replace(/\/+$/, "").split("/").pop() ?? bagPath;
+    setTrackPreview({
+      bag_path: bagPath,
+      timestamp_ns: timestampNs ?? 0,
+      file_path: "",
+      topic: "",
+      source_bag: bagName,
+    });
+  };
 
   return (
     <div className="absolute inset-0">
@@ -38,11 +55,12 @@ export function MapHomePage() {
         <FleetTracksLayer
           tracks={tracks}
           hoveredBagPath={hoveredBagPath}
-          onTrackClick={openBag}
+          onTrackClick={openTrackPreview}
         />
         <AreaDraw mode={drawMode} onArea={search.setArea} onDone={() => setDrawMode(null)} />
         <AreaDisplayLayer area={search.area} />
         <ResultPinsLayer results={search.results} onPinClick={setLightboxIndex} />
+        <BasemapToggle />
       </MapLibreMap>
       <Omnibox
         search={search}
@@ -79,8 +97,8 @@ export function MapHomePage() {
           onClose={() => setLightboxIndex(null)}
           fetchHeatmap={search.activeKind === "region" ? search.fetchHeatmap : undefined}
           getResultHref={(r) => `/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`}
-          onUseAsRegionSupport={(r) => {
-            search.setSupport({ kind: "frame", filePath: r.file_path });
+          onUseAsRegionSupport={(frames, selectedFilePath) => {
+            search.setSupport({ kind: "frame", filePath: selectedFilePath, frames });
             setSupportDialogOpen(true);
             setLightboxIndex(null);
           }}
@@ -90,6 +108,22 @@ export function MapHomePage() {
               state: { results: search.results },
             })
           }
+        />
+      ) : null}
+      {trackPreview ? (
+        <SampleResultLightbox
+          results={[trackPreview]}
+          index={0}
+          onIndexChange={() => {}}
+          onClose={() => setTrackPreview(null)}
+          getResultHref={(r) => `/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`}
+          onUseAsRegionSupport={(frames, selectedFilePath) => {
+            search.setSupport({ kind: "frame", filePath: selectedFilePath, frames });
+            setSupportDialogOpen(true);
+            setTrackPreview(null);
+          }}
+          onExtract={setExtractTarget}
+          onOpenInBag={(r) => navigate(`/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`)}
         />
       ) : null}
       {extractTarget ? (

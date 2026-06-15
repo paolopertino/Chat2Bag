@@ -14,6 +14,23 @@ export function trackColor(index: number): string {
   return PALETTE[index % PALETTE.length];
 }
 
+/** timestamp_ns of the track point nearest to a clicked lng/lat (equirectangular approx). */
+function nearestTimestampNs(track: FleetTrack, lng: number, lat: number): number | undefined {
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  let bestTs: number | undefined;
+  let bestDist = Infinity;
+  for (const p of track.points) {
+    const dx = (p.lon - lng) * cosLat;
+    const dy = p.lat - lat;
+    const dist = dx * dx + dy * dy;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestTs = p.timestamp_ns;
+    }
+  }
+  return bestTs;
+}
+
 function toFeatureCollection(tracks: FleetTrack[]): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
@@ -31,16 +48,20 @@ function toFeatureCollection(tracks: FleetTrack[]): GeoJSON.FeatureCollection {
 interface FleetTracksLayerProps {
   tracks: FleetTrack[];
   hoveredBagPath: string | null;
-  onTrackClick: (bagPath: string) => void;
+  onTrackClick: (bagPath: string, timestampNs?: number) => void;
 }
 
 export function FleetTracksLayer({ tracks, hoveredBagPath, onTrackClick }: FleetTracksLayerProps) {
   const map = useMap();
   const didFitRef = useRef(false);
   const clickRef = useRef(onTrackClick);
+  // The click handler is registered once (on first style-ready add), so read the
+  // latest callback and tracks through refs to avoid stale closures.
+  const tracksRef = useRef(tracks);
 
   useEffect(() => {
     clickRef.current = onTrackClick;
+    tracksRef.current = tracks;
   });
 
   useEffect(() => {
@@ -66,7 +87,13 @@ export function FleetTracksLayer({ tracks, hoveredBagPath, onTrackClick }: Fleet
         });
         map.on("click", "fleet-tracks-line", (e) => {
           const f = e.features?.[0];
-          if (f) clickRef.current(f.properties.bag_path as string);
+          if (!f) return;
+          const bagPath = f.properties.bag_path as string;
+          const track = tracksRef.current.find((t) => t.bag_path === bagPath);
+          const timestampNs = track
+            ? nearestTimestampNs(track, e.lngLat.lng, e.lngLat.lat)
+            : undefined;
+          clickRef.current(bagPath, timestampNs);
         });
         map.on("mouseenter", "fleet-tracks-line", () => {
           map.getCanvas().style.cursor = "pointer";

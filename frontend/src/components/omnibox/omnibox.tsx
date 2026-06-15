@@ -41,12 +41,12 @@ export function Omnibox({
   function toRegionSupport(s: SupportSource | null): RegionSupport | null {
     if (!s) return null;
     if (s.kind === "upload") return { kind: "image", file: s.file, objectUrl: s.objectUrl };
-    return { kind: "frame", filePath: s.filePath };
+    return { kind: "frame", frames: s.frames, selectedFilePath: s.filePath };
   }
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)]/95 px-3 py-1.5 shadow-lg backdrop-blur">
+      <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--glass)] px-3 py-1.5 shadow-lg backdrop-blur">
         <div className="min-w-0 flex-1">
           <SearchInput
             value={search.text}
@@ -134,9 +134,9 @@ export function Omnibox({
           support={toRegionSupport(search.support)}
           initialPoints={search.points}
           onClose={() => setDialogOpen(false)}
-          onConfirm={(points) => {
+          onConfirm={(points, chosenFilePath) => {
             setDialogOpen(false);
-            search.submitSupportRegion(points);
+            search.submitSupportRegion(points, chosenFilePath);
           }}
         />
       ) : null}

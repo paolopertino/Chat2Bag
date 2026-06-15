@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
@@ -14,6 +14,11 @@ import { HeatmapOverlay } from "../search/heatmap-overlay";
 import { AuthImage } from "../ui/auth-image";
 
 const Grid = WidthProvider(ReactGridLayout);
+
+const GRID_MARGIN = 6;
+// Landscape fallback until the first frame reports its true aspect; refined on load
+// so the grid adapts to whatever resolution the cameras actually produce.
+const DEFAULT_IMAGE_ASPECT = 16 / 10;
 
 interface SampleGridViewerProps {
   cameras: string[];
@@ -38,6 +43,31 @@ export function SampleGridViewer({
   const [lastCamKey, setLastCamKey] = useState(camKey);
   const [layout, setLayout] = useState<CameraLayoutV2>(() => readCameraLayoutV2(cameras));
   const [maximized, setMaximized] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [imageAspect, setImageAspect] = useState(DEFAULT_IMAGE_ASPECT);
+
+  // Track the available width so a grid cell can be sized to render the frame at
+  // its native aspect ratio. With rowHeight = colWidth / imageAspect, a square
+  // (w === h) tile is exactly imageAspect wide-to-tall, so the default layout
+  // shows full frames with no letterbox bars — and it holds across surfaces
+  // (narrow bag viewer vs full-width lightbox) since both width and height scale
+  // with the column width.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width > 0) setContainerWidth(width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Mirrors react-grid-layout's column-width math (containerPadding defaults to margin).
+  const colWidth =
+    containerWidth > 0 ? (containerWidth - GRID_MARGIN * (GRID_COLS + 1)) / GRID_COLS : 0;
+  const rowHeight = colWidth > 0 ? colWidth / imageAspect : 56;
 
   // React-recommended derived-state pattern: update synchronously on next render
   // when the camera set changes (different bag opened through the same mount).
@@ -69,7 +99,14 @@ export function SampleGridViewer({
         onDoubleClick={() => setMaximized(maximized === camera ? null : camera)}
       >
         {frame ? (
-          <AuthImage filePath={frame.file_path} alt={camera} className="h-full w-full object-contain" />
+          <AuthImage
+            filePath={frame.file_path}
+            alt={camera}
+            className="h-full w-full object-contain"
+            onNaturalAspect={(aspect) =>
+              setImageAspect((prev) => (Math.abs(prev - aspect) > 0.01 ? aspect : prev))
+            }
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs opacity-40">no frame</div>
         )}
@@ -81,7 +118,7 @@ export function SampleGridViewer({
           />
         ) : null}
         {frame?.is_focus ? <div className="pointer-events-none absolute inset-0 ring-2 ring-amber-400" /> : null}
-        <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] opacity-80">
+        <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] text-white opacity-80">
           {camera}
         </span>
       </div>
@@ -93,12 +130,12 @@ export function SampleGridViewer({
   }
 
   return (
-    <div className={"h-full overflow-y-auto " + (className ?? "")}>
+    <div ref={containerRef} className={"h-full overflow-y-auto " + (className ?? "")}>
       <Grid
         layout={rglLayout}
         cols={GRID_COLS}
-        rowHeight={56}
-        margin={[6, 6]}
+        rowHeight={rowHeight}
+        margin={[GRID_MARGIN, GRID_MARGIN]}
         compactType={null}
         preventCollision
         allowOverlap={false}

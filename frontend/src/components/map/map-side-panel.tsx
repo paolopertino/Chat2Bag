@@ -41,7 +41,7 @@ export function MapSidePanel(props: MapSidePanelProps) {
   }
 
   return (
-    <div className="absolute bottom-28 left-4 top-20 z-10 flex w-72 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)]/95 shadow-lg backdrop-blur">
+    <div className="absolute bottom-28 left-4 top-20 z-10 flex w-72 flex-col rounded-lg border border-[var(--line)] bg-[var(--glass)] shadow-lg backdrop-blur">
       <div className="flex items-center justify-between border-b border-[var(--line)] px-3 py-2">
         <div className="flex gap-1 text-sm">
           <button

@@ -9,6 +9,14 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  readBasemapPref,
+  SATELLITE_ATTRIBUTION,
+  SATELLITE_LAYER_ID,
+  SATELLITE_SOURCE_ID,
+  SATELLITE_TILE_URL,
+} from "../../lib/basemap";
+
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 const MapContext = createContext<maplibregl.Map | null>(null);
@@ -59,7 +67,32 @@ export function MapLibreMap({ children }: { children?: ReactNode }) {
       zoom: 5,
       attributionControl: { compact: true },
     });
-    m.once("style.load", () => m.setProjection({ type: "globe" }));
+    m.once("style.load", () => {
+      m.setProjection({ type: "globe" });
+      // The satellite raster must be inserted before the style's first symbol
+      // layer (so place labels stay readable on top of imagery) and before any
+      // whenStyleReady callback runs (so tracks/pins/areas land above it).
+      // This handler was registered first, so both orderings hold.
+      const firstSymbolId = m.getStyle().layers.find((l) => l.type === "symbol")?.id;
+      m.addSource(SATELLITE_SOURCE_ID, {
+        type: "raster",
+        tiles: [SATELLITE_TILE_URL],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: SATELLITE_ATTRIBUTION,
+      });
+      m.addLayer(
+        {
+          id: SATELLITE_LAYER_ID,
+          type: "raster",
+          source: SATELLITE_SOURCE_ID,
+          layout: {
+            visibility: readBasemapPref() === "satellite" ? "visible" : "none",
+          },
+        },
+        firstSymbolId,
+      );
+    });
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     setMap(m);
     return () => {

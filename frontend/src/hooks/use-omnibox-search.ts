@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Area, Point, SearchResult } from "../api/types";
+import type { SupportFrame } from "../lib/region-support";
 import { useMapArea } from "./use-map-area";
 import { useRegionSearch } from "./use-region-search";
 import { useSourceDraft } from "./use-source-draft";
@@ -8,7 +9,9 @@ import { useUrlSearch } from "./use-url-search";
 
 export type SupportSource =
   | { kind: "upload"; file: File; objectUrl: string }
-  | { kind: "frame"; filePath: string };
+  // `filePath` is the currently-selected frame; `frames` are the per-camera
+  // candidates the user can switch between in the region-support dialog.
+  | { kind: "frame"; filePath: string; frames: SupportFrame[] };
 
 export interface OmniboxSearch {
   text: string;
@@ -33,7 +36,7 @@ export interface OmniboxSearch {
   rawResultCount: number;
   activeKind: "none" | "global" | "region" | "browse";
   submit: () => void;
-  submitSupportRegion: (points: Point[]) => void;
+  submitSupportRegion: (points: Point[], chosenFilePath?: string) => void;
   loadMore: () => void;
   clear: () => void;
   fetchHeatmap: ReturnType<typeof useRegionSearch>["fetchHeatmap"];
@@ -75,7 +78,11 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   );
 
   const regionActive = region.query !== null;
-  const results = regionActive ? region.results : url.results;
+  // useUrlSearch already applies the min-similarity filter to global/browse
+  // results; region results bypass it, so apply the same threshold here.
+  const results = regionActive
+    ? region.results.filter((r) => (r.similarity_score ?? 1) >= url.minScore)
+    : url.results;
   const rawResultCount = regionActive ? region.results.length : url.rawResultCount;
   const activeKind: OmniboxSearch["activeKind"] = regionActive
     ? "region"
@@ -87,21 +94,34 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
           : "none"
       : "none";
 
-  function runRegion(topK: number, regionPoints = points) {
-    if (support?.kind === "upload" && regionPoints.length > 0) {
-      region.runImage(support.file, support.objectUrl, regionPoints, url.bagPaths, topK, area ?? undefined);
-    } else if (support?.kind === "frame" && regionPoints.length > 0) {
-      region.runFrame(support.filePath, regionPoints, url.bagPaths, topK, area ?? undefined);
+  function runRegionWith(src: SupportSource | null, topK: number, regionPoints: Point[]) {
+    if (src?.kind === "upload" && regionPoints.length > 0) {
+      region.runImage(src.file, src.objectUrl, regionPoints, url.bagPaths, topK, area ?? undefined);
+    } else if (src?.kind === "frame" && regionPoints.length > 0) {
+      region.runFrame(src.filePath, regionPoints, url.bagPaths, topK, area ?? undefined);
     } else if (regionMode && text.trim()) {
       region.runText(text.trim(), url.bagPaths, topK, area ?? undefined);
     }
   }
 
-  function submitSupportRegion(nextPoints: Point[]) {
-    setPoints(nextPoints);
-    if (!support || nextPoints.length === 0) return;
+  function runRegion(topK: number, regionPoints = points) {
+    runRegionWith(support, topK, regionPoints);
+  }
+
+  function submitSupportRegion(nextPoints: Point[], chosenFilePath?: string) {
+    // The camera may have been switched inside the dialog, so resolve the
+    // effective support locally and run against it directly — relying on the
+    // `support` state here would use the pre-switch frame (stale-state race).
+    let effective = support;
+    if (chosenFilePath && support?.kind === "frame" && chosenFilePath !== support.filePath) {
+      effective = { ...support, filePath: chosenFilePath };
+      setSupport(effective, nextPoints);
+    } else {
+      setPoints(nextPoints);
+    }
+    if (!effective || nextPoints.length === 0) return;
     url.clear();
-    runRegion(url.topK, nextPoints);
+    runRegionWith(effective, url.topK, nextPoints);
   }
 
   function submit() {

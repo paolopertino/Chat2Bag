@@ -23,15 +23,18 @@ export function HeatmapOverlay({ heatmap, opacity, className }: HeatmapOverlayPr
     ctx.putImageData(imageData, 0, 0);
   }, [heatmap]);
 
-  // Backing store is at patch resolution; CSS stretches it to the image box
-  // (bilinear smoothing). pointerEvents none so the image underneath stays interactive.
+  // Backing store is at patch resolution. objectFit "contain" makes the canvas
+  // letterbox to its own aspect ratio exactly like the object-contain <img> it
+  // overlays, so the heatmap lines up with the frame instead of being stretched
+  // across the whole (black-barred) tile. pointerEvents none keeps the image
+  // underneath interactive.
   return (
     <canvas
       ref={canvasRef}
       width={heatmap.width}
       height={heatmap.height}
       className={className}
-      style={{ opacity, width: "100%", height: "100%", pointerEvents: "none" }}
+      style={{ opacity, width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
     />
   );
 }

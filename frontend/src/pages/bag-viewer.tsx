@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react";
+import { Crosshair, Flame, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router-dom";
 
@@ -9,9 +9,11 @@ import { Omnibox } from "../components/omnibox/omnibox";
 import { ResultsRail } from "../components/search/results-rail";
 import { SampleGridViewer } from "../components/samples/sample-grid-viewer";
 import { TimelineBar } from "../components/samples/timeline-bar";
+import { useHeatmaps } from "../hooks/use-heatmaps";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import { useSampleBrowser } from "../hooks/use-sample-browser";
 import { decodeBagId } from "../lib/bag-id";
+import { framesFromSample } from "../lib/region-support";
 
 export function BagViewerPage() {
   const { bagId } = useParams();
@@ -21,14 +23,40 @@ export function BagViewerPage() {
   const [editMode, setEditMode] = useState(false);
   const [bagRange, setBagRange] = useState<{ first: number; last: number } | null>(null);
   const [extractTimestampNs, setExtractTimestampNs] = useState<number | null>(null);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [showHeatmaps, setShowHeatmaps] = useState(false);
 
   const bagPath = useMemo(() => (bagId ? decodeBagId(bagId) : null), [bagId]);
   const bagName = bagPath ? bagPath.replace(/\/+$/, "").split("/").pop()! : "";
 
   const search = useOmniboxSearch({ scope: { bagPaths: bagPath ? [bagPath] : [] } });
+  const regionActive = search.activeKind === "region";
+
+  // Region heatmaps for the frames currently shown (the timeline's active sample).
+  const visibleFilePaths = useMemo(
+    () =>
+      browser.activeSample
+        ? Object.values(browser.activeSample.frames_by_camera).map((f) => f.file_path)
+        : [],
+    [browser.activeSample],
+  );
+  const heatmaps = useHeatmaps(
+    visibleFilePaths,
+    regionActive ? search.fetchHeatmap : undefined,
+    showHeatmaps,
+  );
 
   const handedResults = (location.state as { results?: SearchResult[] } | null)?.results ?? [];
   const pins = [...handedResults.filter((r) => r.bag_path === bagPath), ...search.results];
+
+  function useSampleAsRegionSupport() {
+    const sample = browser.activeSample;
+    if (!sample) return;
+    const { frames, defaultSelected } = framesFromSample(browser.cameras, sample);
+    if (frames.length === 0) return;
+    search.setSupport({ kind: "frame", filePath: defaultSelected, frames });
+    setSupportDialogOpen(true);
+  }
 
   useEffect(() => {
     if (!bagPath) return;
@@ -67,9 +95,31 @@ export function BagViewerPage() {
           search={search}
           showAreaChip={false}
           showBagChip={false}
-          className="w-[min(640px,80vw)]"
+          className="min-w-0 flex-1"
+          supportDialogOpen={supportDialogOpen}
+          onSupportDialogOpenChange={setSupportDialogOpen}
         />
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button
+            className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-40"
+            onClick={useSampleAsRegionSupport}
+            disabled={!browser.activeSample}
+            title="Pick a camera frame to place region prompts on"
+          >
+            <Crosshair className="h-3 w-3" /> Region support
+          </button>
+          {regionActive ? (
+            <button
+              className={
+                "flex items-center gap-1 rounded border px-2 py-1 text-xs " +
+                (showHeatmaps ? "border-[var(--teal)] bg-[rgb(var(--teal-rgb)/0.2)]" : "border-[var(--line)]")
+              }
+              onClick={() => setShowHeatmaps((v) => !v)}
+              title="Toggle the region-match heatmap on the frames"
+            >
+              <Flame className="h-3 w-3" /> Heatmap
+            </button>
+          ) : null}
           <button
             className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs"
             onClick={() =>
@@ -97,6 +147,8 @@ export function BagViewerPage() {
           cameras={browser.cameras}
           sample={browser.activeSample}
           editMode={editMode}
+          heatmaps={heatmaps}
+          showHeatmaps={showHeatmaps}
         />
       </div>
 

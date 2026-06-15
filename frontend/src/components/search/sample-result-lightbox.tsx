@@ -1,9 +1,11 @@
 import { ArrowLeft, ArrowRight, Crosshair, Download, ExternalLink, Flame, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getSamples } from "../../api/client";
 import type { HeatmapResponse, SampleInfo, SearchResult } from "../../api/types";
+import { useHeatmaps } from "../../hooks/use-heatmaps";
+import { framesFromSample, type SupportFrame } from "../../lib/region-support";
 import { SampleGridViewer } from "../samples/sample-grid-viewer";
 import { Button } from "../ui/button";
 
@@ -14,7 +16,7 @@ interface SampleResultLightboxProps {
   onClose: () => void;
   fetchHeatmap?: (targetFilePath: string) => Promise<HeatmapResponse | null>;
   getResultHref: (result: SearchResult) => string;
-  onUseAsRegionSupport: (result: SearchResult) => void;
+  onUseAsRegionSupport: (frames: SupportFrame[], selectedFilePath: string) => void;
   onExtract?: (result: SearchResult) => void;
   onOpenInBag?: (result: SearchResult) => void;
 }
@@ -70,18 +72,6 @@ export function SampleResultLightbox({
   });
   const [showHeatmaps, setShowHeatmaps] = useState(false);
   const [opacity, setOpacity] = useState(0.6);
-  const [heatmaps, setHeatmaps] = useState<Record<string, HeatmapResponse | undefined>>({});
-  const [heatmapLoading, setHeatmapLoading] = useState<Record<string, boolean | undefined>>({});
-  const heatmapsRef = useRef(heatmaps);
-  const heatmapLoadingRef = useRef(heatmapLoading);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!result) return;
@@ -133,43 +123,7 @@ export function SampleResultLightbox({
     return Object.values(sample.frames_by_camera).map((frame) => frame.file_path);
   }, [sample]);
 
-  useEffect(() => {
-    if (!showHeatmaps || !fetchHeatmap || visibleFilePaths.length === 0) return;
-    const missing = visibleFilePaths.filter(
-      (filePath) => !heatmapsRef.current[filePath] && !heatmapLoadingRef.current[filePath],
-    );
-    if (missing.length === 0) return;
-
-    setHeatmapLoading((previous) => {
-      const next = { ...previous };
-      for (const filePath of missing) next[filePath] = true;
-      heatmapLoadingRef.current = next;
-      return next;
-    });
-
-    for (const filePath of missing) {
-      fetchHeatmap(filePath)
-        .then((heatmap) => {
-          if (mountedRef.current && heatmap) {
-            setHeatmaps((previous) => {
-              const next = { ...previous, [filePath]: heatmap };
-              heatmapsRef.current = next;
-              return next;
-            });
-          }
-        })
-        .catch(() => null)
-        .finally(() => {
-          if (mountedRef.current) {
-            setHeatmapLoading((previous) => {
-              const next = { ...previous, [filePath]: false };
-              heatmapLoadingRef.current = next;
-              return next;
-            });
-          }
-        });
-    }
-  }, [fetchHeatmap, showHeatmaps, visibleFilePaths]);
+  const heatmaps = useHeatmaps(visibleFilePaths, fetchHeatmap, showHeatmaps);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -251,7 +205,7 @@ export function SampleResultLightbox({
               onClick={() => setShowHeatmaps((value) => !value)}
               className={
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs " +
-                (showHeatmaps ? "border-[var(--teal)] bg-[var(--teal)]/30" : "border-white/30 hover:bg-white/10")
+                (showHeatmaps ? "border-[var(--teal)] bg-[rgb(var(--teal-rgb)/0.3)]" : "border-white/30 hover:bg-white/10")
               }
             >
               <Flame className="h-3.5 w-3.5" />
@@ -274,7 +228,14 @@ export function SampleResultLightbox({
         ) : null}
         <button
           type="button"
-          onClick={() => onUseAsRegionSupport(result)}
+          onClick={() => {
+            const built = sample ? framesFromSample(cameras, sample) : { frames: [], defaultSelected: "" };
+            let frames = built.frames;
+            if (!frames.some((f) => f.filePath === result.file_path)) {
+              frames = [{ camera: result.topic, filePath: result.file_path }, ...frames];
+            }
+            onUseAsRegionSupport(frames, result.file_path);
+          }}
           className="inline-flex items-center gap-1.5 rounded-full border border-white/30 px-3 py-1 text-xs hover:bg-white/10"
         >
           <Crosshair className="h-3.5 w-3.5" /> Use as region support

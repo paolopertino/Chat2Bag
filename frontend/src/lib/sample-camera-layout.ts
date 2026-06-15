@@ -53,13 +53,17 @@ const KEY_PREFIX = "sample-camera-layout:";
 export function defaultLayoutV2(cameras: string[]): CameraLayoutV2 {
   const { cols } = defaultGridDimensions(cameras.length);
   const w = Math.max(1, Math.floor(GRID_COLS / cols));
+  // Square cells: with the viewer's rowHeight = colWidth / imageAspect, a w === h
+  // tile renders at the frame's aspect ratio, so the default layout has no
+  // letterbox bars regardless of camera count.
+  const h = w;
   const tiles: Record<string, CameraTile> = {};
   cameras.forEach((camera, i) => {
     tiles[camera] = {
       x: (i % cols) * w,
-      y: Math.floor(i / cols) * TILE_DEFAULT_H,
+      y: Math.floor(i / cols) * h,
       w,
-      h: TILE_DEFAULT_H,
+      h,
     };
   });
   return { version: 2, cameras: [...cameras].sort(), tiles };

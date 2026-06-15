@@ -34,7 +34,7 @@ export function TimelineBar(props: TimelineBarProps) {
       : 0;
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)]/95 px-2 py-1.5">
+    <div className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--glass)] px-2 py-1.5 backdrop-blur">
       <button onClick={props.onLoadLeft} disabled={!props.canLoadLeft} aria-label="Load earlier">
         <ChevronLeft className="h-4 w-4" />
       </button>
