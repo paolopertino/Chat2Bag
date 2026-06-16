@@ -12,7 +12,6 @@ dependencies = [
     "fastapi>=0.128.0",
     "lancedb>=0.27.1",
     "numpy>=2.2.6",
-    "ollama>=0.6.1",
     "opencv-python>=4.13.0.92",
     "pandas>=2.3.3",
     "passlib[bcrypt]>=1.7.4",

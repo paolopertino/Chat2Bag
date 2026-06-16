@@ -13,7 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from src.api import (
     auth_router,
     bags_router,
-    chat_router,
     datasets_router,
     image_router,
     indexing_router,
@@ -133,7 +132,6 @@ app.include_router(bags_router)
 app.include_router(image_router)
 app.include_router(indexing_router)
 app.include_router(search_router)
-app.include_router(chat_router)
 app.include_router(datasets_router)
 
 

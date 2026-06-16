@@ -2,17 +2,17 @@
 
 ## Project Overview
 - **Name**: Bag-GPT
-- **Purpose**: Multimodal RAG backend for processing and searching ROS2 bag files (.mcap). Enables frame extraction, semantic visual search via embeddings, and video understanding via VLMs.
-- **Tech Stack**: Python 3.10+ (FastAPI, Transformers, LanceDB, PyTorch), TypeScript (React 19, Vite 8, TailwindCSS), Ollama (qwen3-vl)
+- **Purpose**: Multimodal RAG backend for processing and searching ROS2 bag files (.mcap). Enables frame extraction and semantic visual search via embeddings.
+- **Tech Stack**: Python 3.10+ (FastAPI, Transformers, LanceDB, PyTorch), TypeScript (React 19, Vite 8, TailwindCSS)
 
 ## Architecture
 
 Entry point: `app.py` (FastAPI with lifespan events for model loading/cleanup).
 
-Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), `retriever/` (vector search, Ollama VLM chat), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
+Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), `retriever/` (vector search), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
 
 **Key patterns**:
-- Component Factory: `BackendComponentFactory` creates BagParser, Indexer, VideoChat, GlobalSearcher with shared models
+- Component Factory: `BackendComponentFactory` creates BagParser, Indexer, GlobalSearcher with shared models
 - Dependency Injection: `Request.app.state` stores factory, models, searcher
 - Background Tasks: FastAPI BackgroundTasks for async bag indexing
 - Vector Search: LanceDB with SigLIP-2 embeddings, temporal deduplication
@@ -116,7 +116,6 @@ Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single groupe
 - **Image size**: 512x512 max
 - **Batch size**: 8 frames
 - **Embedding model**: `google/siglip2-base-patch16-naflex`
-- **Video VLM**: `qwen3-vl:2b` (via Ollama)
 - **Temporal dedup window**: 20 seconds
 - **Scan timeout**: 30 seconds
 
@@ -125,8 +124,6 @@ Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single groupe
 **Indexing**: POST /api/index -> BagParser extracts frames -> Indexer builds LanceDB embeddings -> status: idle -> indexing -> done/error
 
 **Search**: POST /api/search (text) or /api/search/image -> GlobalSearcher queries LanceDB -> temporal dedup -> ranked results
-
-**Chat**: POST /api/chat with timestamp window -> VideoChat loads frames -> Ollama (qwen3-vl) processes frames + query -> response
 
 ## Artifacts
 

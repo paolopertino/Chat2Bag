@@ -14,7 +14,6 @@ _FAKE_SETTINGS = {
     "embedding": {"backend": "siglip2", "model": "google/siglip2-base-patch16-naflex"},
     "models": {
         "orchestration_llm": "gemma-2-9b",
-        "video_vlm": "qwen3-vl:2b",
         "model_storage": "models",
     },
     "search": {"temporal_dedup_window_sec": 20.0, "map_browse_cap": 500},

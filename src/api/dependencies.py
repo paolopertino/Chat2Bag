@@ -1,7 +1,6 @@
 from fastapi import HTTPException, Request
 
 from src.api.state import indexing_errors, indexing_status
-from src.services.chat_service import ChatService
 from src.services.extraction_service import ExtractionService
 from src.services.indexing_service import IndexingService
 from src.services.map_search_service import MapSearchService
@@ -35,10 +34,6 @@ def get_region_search_service(request: Request) -> RegionSearchService:
 
 def get_map_search_service(request: Request) -> MapSearchService:
     return request.app.state.component_factory.create_map_search_service()
-
-
-def get_chat_service(request: Request) -> ChatService:
-    return ChatService(factory=request.app.state.component_factory)
 
 
 def get_extraction_service(request: Request) -> ExtractionService:

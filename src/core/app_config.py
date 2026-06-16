@@ -25,7 +25,6 @@ class StorageConfig:
 @dataclass(frozen=True)
 class ModelsConfig:
     orchestration_llm: str
-    video_vlm: str
     model_storage: str
 
 
@@ -151,7 +150,6 @@ def get_app_config() -> AppConfig:
         ),
         models=ModelsConfig(
             orchestration_llm=str(settings["models"]["orchestration_llm"]),
-            video_vlm=str(settings["models"]["video_vlm"]),
             model_storage=str(settings["models"]["model_storage"]),
         ),
         embedding=EmbeddingConfig(

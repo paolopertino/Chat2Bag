@@ -105,10 +105,6 @@ export interface SamplesResponse {
   samples: SampleInfo[];
 }
 
-export interface ChatResponse {
-  response: string;
-}
-
 // ---- Dataset extraction types ----
 
 export type ExtractionJobStatus = "queued" | "running" | "done" | "error" | "cancelled";
