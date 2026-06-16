@@ -89,7 +89,7 @@ export function BagViewerPage() {
 
   return (
     <div className="absolute inset-0 flex flex-col gap-2 p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pr-44">
         <h1 className="shrink-0 truncate text-sm font-semibold">{bagName}</h1>
         <Omnibox
           search={search}
