@@ -48,6 +48,8 @@ Two-surface map-first UI (shipped 2026-06-10):
 
 Map-first redesign **shipped** on `feat/frontend-refactor` (2026-06-10). All 20 implementation tasks complete. Legacy pages (`/workspace`, dashboard, `/search`, bags list, detail page), `MainLayout`, Leaflet stack, and chat UI have been deleted.
 
+Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single grouped, nested bag tree in the sidebar (one shared `BagsProvider` instance) with per-bag visibility toggles that scope both search and fleet tracks, and surfaced indexing failures (backend `indexing_errors` store via `/scan` + `/status`) with a retry action. Similarity thresholds are now per-type (text 0.14 / visual 0.80, localStorage-persisted), image upload with no region points runs a global search, and the results rail insets to clear the sidebar and map controls.
+
 ## Development Standards
 
 ### Code Style
