@@ -2,37 +2,36 @@ import { PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import type { BagInfo } from "../../api/types";
-import { trackColor } from "./fleet-tracks-layer";
+import { BagTree } from "./bag-tree";
 
 interface MapSidePanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   bags: BagInfo[];
-  locatedOrder: string[]; // bag_paths in the order tracks are drawn (for color match)
+  root: string | null;
+  locatedOrder: string[];
   rootDir: string;
   setRootDir: (dir: string) => void;
   isScanning: boolean;
   onScan: () => void;
   onIndex: (bagPath: string) => void;
+  onRetry: (bagPath: string) => void;
+  isBagHidden: (bagPath: string) => boolean;
+  onToggleBagVisibility: (bagPath: string) => void;
+  onSetGroupHidden: (bagPaths: string[], hidden: boolean) => void;
   onHoverBag: (bagPath: string | null) => void;
   onOpenBag: (bagPath: string) => void;
-  jobsTab: ReactNode; // filled in Task 17; pass null until then
-}
-
-function statusBadge(bag: BagInfo): string {
-  if (bag.status === "indexing") return "⏳ indexing";
-  if (!bag.is_indexed) return "not indexed";
-  if (!bag.is_located) return "⚠ no GPS";
-  return "✓";
+  jobsTab: ReactNode;
 }
 
 export function MapSidePanel(props: MapSidePanelProps) {
-  const [open, setOpen] = useState(true);
   const [tab, setTab] = useState<"bags" | "jobs">("bags");
 
-  if (!open) {
+  if (!props.open) {
     return (
       <button
         className="absolute left-4 top-20 z-10 rounded-md border border-[var(--line)] bg-[var(--surface)] p-2"
-        onClick={() => setOpen(true)}
+        onClick={() => props.onOpenChange(true)}
         aria-label="Open bag panel"
       >
         <PanelLeftOpen className="h-4 w-4" />
@@ -58,7 +57,7 @@ export function MapSidePanel(props: MapSidePanelProps) {
             Jobs
           </button>
         </div>
-        <button onClick={() => setOpen(false)} aria-label="Collapse panel">
+        <button onClick={() => props.onOpenChange(false)} aria-label="Collapse panel">
           <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
@@ -81,38 +80,18 @@ export function MapSidePanel(props: MapSidePanelProps) {
               <RefreshCw className={"h-4 w-4" + (props.isScanning ? " animate-spin" : "")} />
             </button>
           </div>
-          <ul className="min-h-0 flex-1 overflow-y-auto p-1">
-            {props.bags.map((bag) => {
-              const colorIdx = props.locatedOrder.indexOf(bag.bag_path);
-              return (
-                <li
-                  key={bag.bag_path}
-                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-white/5"
-                  onMouseEnter={() => props.onHoverBag(bag.bag_path)}
-                  onMouseLeave={() => props.onHoverBag(null)}
-                  onClick={() => bag.is_indexed && props.onOpenBag(bag.bag_path)}
-                >
-                  <span
-                    className="h-2 w-2 flex-none rounded-full"
-                    style={{ background: colorIdx >= 0 ? trackColor(colorIdx) : "#777" }}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{bag.bag_name}</span>
-                  <span className="flex-none text-xs opacity-70">{statusBadge(bag)}</span>
-                  {!bag.is_indexed && bag.status !== "indexing" ? (
-                    <button
-                      className="flex-none rounded border border-[var(--line)] px-1.5 text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        props.onIndex(bag.bag_path);
-                      }}
-                    >
-                      index
-                    </button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          <BagTree
+            bags={props.bags}
+            root={props.root}
+            locatedOrder={props.locatedOrder}
+            isBagHidden={props.isBagHidden}
+            onToggleBagVisibility={props.onToggleBagVisibility}
+            onSetGroupHidden={props.onSetGroupHidden}
+            onIndex={props.onIndex}
+            onRetry={props.onRetry}
+            onHoverBag={props.onHoverBag}
+            onOpenBag={props.onOpenBag}
+          />
         </>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto p-2">{props.jobsTab}</div>

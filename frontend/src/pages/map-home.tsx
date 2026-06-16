@@ -30,6 +30,7 @@ export function MapHomePage() {
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [extractTarget, setExtractTarget] = useState<SearchResult | null>(null);
   const [trackPreview, setTrackPreview] = useState<SearchResult | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const search = useOmniboxSearch();
 
   // Esc exits an armed draw tool entirely (terra-draw's own Esc only clears the
@@ -106,13 +107,20 @@ export function MapHomePage() {
         className="absolute inset-x-4 bottom-4 z-10"
       />
       <MapSidePanel
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
         bags={bagsState.bags}
+        root={bagsState.scannedRoot}
         locatedOrder={tracks.map((t) => t.bag_path)}
         rootDir={bagsState.rootDir}
         setRootDir={bagsState.setRootDir}
         isScanning={bagsState.isScanning}
         onScan={bagsState.onScan}
         onIndex={bagsState.onIndex}
+        onRetry={bagsState.onRetry}
+        isBagHidden={bagsState.isBagHidden}
+        onToggleBagVisibility={bagsState.toggleBagVisibility}
+        onSetGroupHidden={bagsState.setBagsHidden}
         onHoverBag={setHoveredBagPath}
         onOpenBag={openBag}
         jobsTab={<JobsTab />}
