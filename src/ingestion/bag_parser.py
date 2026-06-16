@@ -3,11 +3,12 @@ import json
 import logging
 import re
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import cv2
 
-from rosbags.rosbag2 import Reader
+from rosbags.rosbag2 import Reader, ReaderError
 from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
@@ -18,6 +19,43 @@ from src.core.storage import resolve_artifact_path
 from src.ingestion.gps import fix_from_navsatfix, locate_frames
 
 logger = logging.getLogger(__name__)
+
+
+class BagReadError(Exception):
+    """A bag's storage file could not be read (e.g. a corrupt or unfinalized MCAP)."""
+
+
+def describe_reader_error(exc: ReaderError, bag_name: str) -> str:
+    """Translate a low-level rosbags ReaderError into an actionable message.
+
+    The most common failure is an MCAP whose footer/end-magic is missing — a
+    recording that was interrupted and never finalized. rosbags reports this as
+    a terse "File (end) magic is invalid", which is opaque to end users.
+    """
+    text = str(exc)
+    if "magic" in text.lower():
+        return (
+            f"{bag_name} is not a readable rosbag2 MCAP — the recording looks "
+            "incomplete or corrupt (its MCAP footer is missing, so it was never "
+            "finalized). Re-copy the bag from its source, or repair it with "
+            f"`mcap recover`, then re-index. (rosbags: {text})"
+        )
+    return f"Could not read {bag_name}: {text}"
+
+
+@contextmanager
+def _open_bag(bag_path: Path):
+    """Open a bag for reading, translating rosbags read failures.
+
+    Used as a context manager exactly like ``Reader`` itself; any ``ReaderError``
+    (at open time or while iterating messages) becomes a ``BagReadError`` with a
+    human-readable explanation instead of a terse rosbags message.
+    """
+    try:
+        with Reader(bag_path) as reader:
+            yield reader
+    except ReaderError as exc:
+        raise BagReadError(describe_reader_error(exc, bag_path.name)) from exc
 
 
 def camera_slug(topic: str) -> str:
@@ -78,7 +116,7 @@ class BagParser:
         last_saved_ns: dict[str, int] = {}
         saved_count = 0
 
-        with Reader(self.bag_path) as reader:
+        with _open_bag(self.bag_path) as reader:
             camera_connections = [c for c in reader.connections if c.topic in self.topics]
             present_topics = sorted({c.topic for c in camera_connections})
             if not present_topics:

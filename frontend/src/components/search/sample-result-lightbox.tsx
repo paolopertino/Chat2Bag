@@ -1,11 +1,17 @@
-import { ArrowLeft, ArrowRight, Crosshair, ExternalLink, Flame, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Crosshair, Download, ExternalLink, Flame, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getSamples } from "../../api/client";
 import type { HeatmapResponse, SampleInfo, SearchResult } from "../../api/types";
-import { SampleViewer } from "../samples/sample-viewer";
+import { useHeatmaps } from "../../hooks/use-heatmaps";
+import { framesFromSample, type SupportFrame } from "../../lib/region-support";
+import { SampleGridViewer } from "../samples/sample-grid-viewer";
 import { Button } from "../ui/button";
+
+// Track previews click a GPS timestamp, not a frame timestamp — probe a window wide
+// enough to contain a nearby camera sample (mirrors the bag viewer's default window).
+const PREVIEW_WINDOW_SECONDS = 10;
 
 interface SampleResultLightboxProps {
   results: SearchResult[];
@@ -14,7 +20,9 @@ interface SampleResultLightboxProps {
   onClose: () => void;
   fetchHeatmap?: (targetFilePath: string) => Promise<HeatmapResponse | null>;
   getResultHref: (result: SearchResult) => string;
-  onUseAsRegionSupport: (result: SearchResult) => void;
+  onUseAsRegionSupport: (frames: SupportFrame[], selectedFilePath: string) => void;
+  onExtract?: (result: SearchResult) => void;
+  onOpenInBag?: (result: SearchResult) => void;
 }
 
 interface SampleLoadState {
@@ -30,6 +38,7 @@ function resultKey(result: SearchResult): string {
 }
 
 function pickSample(samples: SampleInfo[], result: SearchResult): SampleInfo | null {
+  if (samples.length === 0) return null;
   return (
     samples.find((sample) =>
       Object.values(sample.frames_by_camera).some(
@@ -41,8 +50,14 @@ function pickSample(samples: SampleInfo[], result: SearchResult): SampleInfo | n
       || Object.values(sample.frames_by_camera).some((frame) => frame.file_path === result.file_path),
     ) ??
     samples.find((sample) => sample.timestamp_ns === result.timestamp_ns) ??
-    samples[0] ??
-    null
+    // Track previews click a GPS timestamp that rarely lands exactly on a frame, so
+    // fall back to the sample nearest the requested time rather than the first one.
+    samples.reduce((best, sample) =>
+      Math.abs(sample.timestamp_ns - result.timestamp_ns) <
+      Math.abs(best.timestamp_ns - result.timestamp_ns)
+        ? sample
+        : best,
+    )
   );
 }
 
@@ -54,6 +69,8 @@ export function SampleResultLightbox({
   fetchHeatmap,
   getResultHref,
   onUseAsRegionSupport,
+  onExtract,
+  onOpenInBag,
 }: SampleResultLightboxProps) {
   const result = results[index];
   const key = result ? resultKey(result) : "";
@@ -66,18 +83,6 @@ export function SampleResultLightbox({
   });
   const [showHeatmaps, setShowHeatmaps] = useState(false);
   const [opacity, setOpacity] = useState(0.6);
-  const [heatmaps, setHeatmaps] = useState<Record<string, HeatmapResponse | undefined>>({});
-  const [heatmapLoading, setHeatmapLoading] = useState<Record<string, boolean | undefined>>({});
-  const heatmapsRef = useRef(heatmaps);
-  const heatmapLoadingRef = useRef(heatmapLoading);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!result) return;
@@ -92,7 +97,17 @@ export function SampleResultLightbox({
       error: null,
     }));
 
-    getSamples(result.bag_path, result.timestamp_ns, 1, result.file_path)
+    // A focused result (search hit) resolves to an exact frame, so a 1s probe is
+    // enough. A track preview clicks a GPS timestamp with no focus frame; camera
+    // frames are sparse (~1 FPS) and rarely fall inside a 1s forward window, so query
+    // a wider window centred on the click and let pickSample snap to the nearest sample.
+    const hasFocus = Boolean(result.file_path);
+    const durationSec = hasFocus ? 1 : PREVIEW_WINDOW_SECONDS;
+    const startNs = hasFocus
+      ? result.timestamp_ns
+      : Math.max(0, Math.floor(result.timestamp_ns - (durationSec * 1_000_000_000) / 2));
+
+    getSamples(result.bag_path, startNs, durationSec, result.file_path)
       .then((response) => {
         if (cancelled) return;
         setSampleState({
@@ -129,43 +144,7 @@ export function SampleResultLightbox({
     return Object.values(sample.frames_by_camera).map((frame) => frame.file_path);
   }, [sample]);
 
-  useEffect(() => {
-    if (!showHeatmaps || !fetchHeatmap || visibleFilePaths.length === 0) return;
-    const missing = visibleFilePaths.filter(
-      (filePath) => !heatmapsRef.current[filePath] && !heatmapLoadingRef.current[filePath],
-    );
-    if (missing.length === 0) return;
-
-    setHeatmapLoading((previous) => {
-      const next = { ...previous };
-      for (const filePath of missing) next[filePath] = true;
-      heatmapLoadingRef.current = next;
-      return next;
-    });
-
-    for (const filePath of missing) {
-      fetchHeatmap(filePath)
-        .then((heatmap) => {
-          if (mountedRef.current && heatmap) {
-            setHeatmaps((previous) => {
-              const next = { ...previous, [filePath]: heatmap };
-              heatmapsRef.current = next;
-              return next;
-            });
-          }
-        })
-        .catch(() => null)
-        .finally(() => {
-          if (mountedRef.current) {
-            setHeatmapLoading((previous) => {
-              const next = { ...previous, [filePath]: false };
-              heatmapLoadingRef.current = next;
-              return next;
-            });
-          }
-        });
-    }
-  }, [fetchHeatmap, showHeatmaps, visibleFilePaths]);
+  const heatmaps = useHeatmaps(visibleFilePaths, fetchHeatmap, showHeatmaps);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -208,16 +187,21 @@ export function SampleResultLightbox({
         </button>
 
         <div className="min-h-0 flex-1">
-          <SampleViewer
-            cameras={cameras}
-            sample={sample}
-            isLoading={isLoadingSample}
-            heatmaps={heatmaps}
-            heatmapLoading={heatmapLoading}
-            showHeatmaps={canShowHeatmaps && showHeatmaps}
-            heatmapOpacity={opacity}
-            className="h-full rounded-md"
-          />
+          {isLoadingSample ? (
+            <div className="flex min-h-[320px] items-center justify-center bg-black rounded-md">
+              <span className="text-xs text-white/60">Loading…</span>
+            </div>
+          ) : (
+            <SampleGridViewer
+              cameras={cameras}
+              sample={sample}
+              editMode={false}
+              heatmaps={heatmaps}
+              showHeatmaps={canShowHeatmaps && showHeatmaps}
+              heatmapOpacity={opacity}
+              className="h-full rounded-md"
+            />
+          )}
           {activeSampleState?.error ? (
             <p className="mt-2 text-center text-xs text-white/70">{activeSampleState.error}</p>
           ) : null}
@@ -242,7 +226,7 @@ export function SampleResultLightbox({
               onClick={() => setShowHeatmaps((value) => !value)}
               className={
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs " +
-                (showHeatmaps ? "border-[var(--teal)] bg-[var(--teal)]/30" : "border-white/30 hover:bg-white/10")
+                (showHeatmaps ? "border-[var(--teal)] bg-[rgb(var(--teal-rgb)/0.3)]" : "border-white/30 hover:bg-white/10")
               }
             >
               <Flame className="h-3.5 w-3.5" />
@@ -265,16 +249,38 @@ export function SampleResultLightbox({
         ) : null}
         <button
           type="button"
-          onClick={() => onUseAsRegionSupport(result)}
+          onClick={() => {
+            const built = sample ? framesFromSample(cameras, sample) : { frames: [], defaultSelected: "" };
+            let frames = built.frames;
+            if (!frames.some((f) => f.filePath === result.file_path)) {
+              frames = [{ camera: result.topic, filePath: result.file_path }, ...frames];
+            }
+            onUseAsRegionSupport(frames, result.file_path);
+          }}
           className="inline-flex items-center gap-1.5 rounded-full border border-white/30 px-3 py-1 text-xs hover:bg-white/10"
         >
           <Crosshair className="h-3.5 w-3.5" /> Use as region support
         </button>
-        <Button asChild variant="secondary" size="sm">
-          <Link to={getResultHref(result)}>
+        {onExtract ? (
+          <button
+            type="button"
+            onClick={() => onExtract(result)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/30 px-3 py-1 text-xs hover:bg-white/10"
+          >
+            <Download className="h-3.5 w-3.5" /> Extract…
+          </button>
+        ) : null}
+        {onOpenInBag ? (
+          <Button variant="secondary" size="sm" onClick={() => onOpenInBag(result)}>
             <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Explorer
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button asChild variant="secondary" size="sm">
+            <Link to={getResultHref(result)}>
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Explorer
+            </Link>
+          </Button>
+        )}
         <span className="text-xs text-white/60">
           {index + 1} / {results.length}
         </span>

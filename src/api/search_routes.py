@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_map_search_service, get_region_search_service, get_search_service
 from src.auth.dependencies import require_current_user
+from src.services.frame_location import attach_locations
 from src.services.map_search_service import MapSearchService
 from src.services.region_search_service import RegionSearchService
 from src.services.search_service import SearchService
@@ -44,14 +45,14 @@ class MapSearchRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1)
     bag_paths: List[str]
-    top_k: int = Field(default=5, ge=1, le=100)
+    top_k: int = Field(default=100, ge=1, le=500)
     area: Optional[Area] = None
 
 
 class SimilarSearchRequest(BaseModel):
     file_path: str = Field(..., min_length=1)
     bag_paths: List[str]
-    top_k: int = Field(default=5, ge=1, le=100)
+    top_k: int = Field(default=100, ge=1, le=500)
     area: Optional[Area] = None
 
 
@@ -64,14 +65,14 @@ class RegionByFrameRequest(BaseModel):
     support_file_path: str = Field(..., min_length=1)
     points: List[Point] = Field(..., min_length=1)
     bag_paths: List[str]
-    top_k: int = Field(default=5, ge=1, le=100)
+    top_k: int = Field(default=100, ge=1, le=500)
     area: Optional[Area] = None
 
 
 class RegionByTextRequest(BaseModel):
     text: str = Field(..., min_length=1)
     bag_paths: List[str]
-    top_k: int = Field(default=5, ge=1, le=100)
+    top_k: int = Field(default=100, ge=1, le=500)
     area: Optional[Area] = None
 
 
@@ -102,6 +103,7 @@ async def search_bags(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    attach_locations(results)
     return {"query": req.query, "results": results}
 
 
@@ -125,7 +127,7 @@ async def search_bags_by_image(
     search_service: Annotated[SearchService, Depends(get_search_service)],
     image: UploadFile = File(...),
     bag_paths: List[str] = Form(...),
-    top_k: int = Form(default=5, ge=1, le=100),
+    top_k: int = Form(default=100, ge=1, le=500),
     area: Optional[str] = Form(default=None),
 ):
     """Federated image search across multiple bags using uploaded image content."""
@@ -144,6 +146,7 @@ async def search_bags_by_image(
     except OSError as exc:
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
+    attach_locations(results)
     return {"query": "image", "results": results}
 
 
@@ -167,6 +170,7 @@ async def search_similar_images(
     except OSError as exc:
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
+    attach_locations(results)
     return {"query": "similar", "results": results}
 
 
@@ -181,6 +185,7 @@ async def region_search_by_text(
                                           area=req.area.model_dump() if req.area else None)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    attach_locations(results)
     return {"query": req.text, "results": results}
 
 
@@ -204,6 +209,7 @@ async def region_search_by_frame(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    attach_locations(results)
     return {"query": "region:frame", "results": results}
 
 
@@ -213,7 +219,7 @@ async def region_search_by_image(
     image: UploadFile = File(...),
     points: str = Form(...),
     bag_paths: List[str] = Form(...),
-    top_k: int = Form(default=5, ge=1, le=100),
+    top_k: int = Form(default=100, ge=1, le=500),
     area: Optional[str] = Form(default=None),
 ):
     """Region search from points on an uploaded Support image. `points` is a JSON array."""
@@ -231,6 +237,7 @@ async def region_search_by_image(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    attach_locations(results)
     return {"query": "region:image", "results": results}
 
 

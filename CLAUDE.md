@@ -2,17 +2,17 @@
 
 ## Project Overview
 - **Name**: Bag-GPT
-- **Purpose**: Multimodal RAG backend for processing and searching ROS2 bag files (.mcap). Enables frame extraction, semantic visual search via embeddings, and video understanding via VLMs.
-- **Tech Stack**: Python 3.10+ (FastAPI, Transformers, LanceDB, PyTorch), TypeScript (React 19, Vite 8, TailwindCSS), Ollama (qwen3-vl)
+- **Purpose**: Multimodal RAG backend for processing and searching ROS2 bag files (.mcap). Enables frame extraction and semantic visual search via embeddings.
+- **Tech Stack**: Python 3.10+ (FastAPI, Transformers, LanceDB, PyTorch), TypeScript (React 19, Vite 8, TailwindCSS)
 
 ## Architecture
 
 Entry point: `app.py` (FastAPI with lifespan events for model loading/cleanup).
 
-Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), `retriever/` (vector search, Ollama VLM chat), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
+Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), `retriever/` (vector search), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
 
 **Key patterns**:
-- Component Factory: `BackendComponentFactory` creates BagParser, Indexer, VideoChat, GlobalSearcher with shared models
+- Component Factory: `BackendComponentFactory` creates BagParser, Indexer, GlobalSearcher with shared models
 - Dependency Injection: `Request.app.state` stores factory, models, searcher
 - Background Tasks: FastAPI BackgroundTasks for async bag indexing
 - Vector Search: LanceDB with SigLIP-2 embeddings, temporal deduplication
@@ -20,23 +20,35 @@ Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLi
 
 ## Frontend Structure
 
-React Router v6 shell built during the Phase 1 refactor:
+Two-surface map-first UI (shipped 2026-06-10):
+
 - `AuthProvider` (silent refresh on mount) wraps `<RouterProvider>`
 - `ProtectedRoute` redirects to `/login` when unauthenticated
-- `MainLayout` (top bar + optional sidebar slot) wraps the dashboard and feature pages
-- Routes: `/login`, `/` (Dashboard), `/workspace` (legacy all-in-one UI, temporary), `/bags/*` and `/datasets/*` stubs
-- `useSidebar(render, deps)` hook: pages inject their sidebar via a render factory + explicit deps (NOT inline JSX — that triggered React #185)
+- `FullBleedLayout` (TopBar only, no sidebar) wraps both surfaces
+- Routes: `/login`, `/` (Map home), `/bags/:bagId` (Bag viewer), `*` → redirect `/`
 
-## Refactoring Roadmap
+**Map home (`/`):** MapLibre GL globe (OpenFreeMap tiles) + `FleetTracksLayer` (colored GPS tracks per indexed bag) + `AreaDraw`/`AreaDisplayLayer` (terra-draw polygon/circle filter) + `Omnibox` (centered pill bar: text/image/region/area/bag/top-k chips) + `MapSidePanel` (Bags tab + Jobs tab) + `ResultsRail` (horizontal thumbnail strip) + `ResultPinsLayer` (clustered orange dots) + `SampleResultLightbox` (full Sample view with heatmap, use-as-support, open-in-bag, extract actions)
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Auth (JWT + SQLite) + router scaffold + layout | ✅ Done on branch `frontend-refactor` |
-| 2 | `/bags` — carve bag scanning, bag list, sequence viewer out of WorkspacePage | ⬜ Not started — no spec/plan yet |
-| 3 | `/search` — carve search bar + results grid out of WorkspacePage | ⬜ Not started |
-| 4 | `/datasets` — dataset extraction / jobs UI | ⬜ Not started |
+**Bag viewer (`/bags/:bagId`):** `SampleGridViewer` (react-grid-layout snap-grid, 12-column, `editMode` drag/resize persisted to localStorage via `readCameraLayoutV2`/`saveCameraLayoutV2`) + `TimelineBar` (normalized axis, amber pins for search hits, ← / → load more) + scoped `Omnibox` (showAreaChip=false, showBagChip=false) + `ExtractDialog`
 
-When Phase 4 is done, delete `/workspace` and `WorkspacePage`. Design spec for Phase 1 lives at `docs/superpowers/specs/2026-04-23-auth-routing-scaffold-design.md` — reference it for the routing patterns Phases 2–4 must follow.
+**Key components:**
+- `frontend/src/components/map/` — MapLibre wrappers (`maplibre-map.tsx`, `fleet-tracks-layer.tsx`, `area-draw.tsx`, `area-display-layer.tsx`, `result-pins-layer.tsx`, `map-side-panel.tsx`, `jobs-tab.tsx`)
+- `frontend/src/components/omnibox/` — `omnibox.tsx`, `support-chip.tsx`
+- `frontend/src/components/search/` — `results-rail.tsx`, `sample-result-lightbox.tsx`, `region-support-dialog.tsx`, `heatmap-overlay.tsx`, and chip components
+- `frontend/src/components/samples/` — `sample-grid-viewer.tsx`, `timeline-bar.tsx`
+- `frontend/src/components/extract/` — `extract-dialog.tsx`
+- `frontend/src/hooks/` — `use-omnibox-search.ts` (orchestrates url+region+area search), `use-fleet-tracks.ts`, `use-sample-browser.ts`, `use-url-search.ts`, `use-region-search.ts`, `use-map-area.ts`, `use-source-draft.ts`
+- `frontend/src/lib/` — `sample-camera-layout.ts` (v2 snap-grid layout; v1 types kept for migration), `bag-id.ts` (URL-safe base64 for bag paths), `area-codec.ts`, `rgl-compat.ts` (react-grid-layout CJS shim)
+
+**CSS variables:** `--surface` (panel/card backgrounds), `--line` (borders), `--ink` (text), `--ink-soft`, `--canvas` (page background). Use `--surface` not `--panel`.
+
+**Layout persistence:** `readCameraLayoutV2(cameras)` / `saveCameraLayoutV2(layout)` — keyed by sorted camera list, localStorage; migrates v1 layouts; seeds from best-overlap saved layout for new camera sets.
+
+## Status
+
+Map-first redesign **shipped** on `feat/frontend-refactor` (2026-06-10). All 20 implementation tasks complete. Legacy pages (`/workspace`, dashboard, `/search`, bags list, detail page), `MainLayout`, Leaflet stack, and chat UI have been deleted.
+
+Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single grouped, nested bag tree in the sidebar (one shared `BagsProvider` instance) with per-bag visibility toggles that scope both search and fleet tracks, and surfaced indexing failures (backend `indexing_errors` store via `/scan` + `/status`) with a retry action. Similarity thresholds are now per-type (text 0.14 / visual 0.80, localStorage-persisted), image upload with no region points runs a global search, and the results rail insets to clear the sidebar and map controls.
 
 ## Development Standards
 
@@ -104,7 +116,6 @@ When Phase 4 is done, delete `/workspace` and `WorkspacePage`. Design spec for P
 - **Image size**: 512x512 max
 - **Batch size**: 8 frames
 - **Embedding model**: `google/siglip2-base-patch16-naflex`
-- **Video VLM**: `qwen3-vl:2b` (via Ollama)
 - **Temporal dedup window**: 20 seconds
 - **Scan timeout**: 30 seconds
 
@@ -114,8 +125,6 @@ When Phase 4 is done, delete `/workspace` and `WorkspacePage`. Design spec for P
 
 **Search**: POST /api/search (text) or /api/search/image -> GlobalSearcher queries LanceDB -> temporal dedup -> ranked results
 
-**Chat**: POST /api/chat with timestamp window -> VideoChat loads frames -> Ollama (qwen3-vl) processes frames + query -> response
-
 ## Artifacts
 
 Indexing produces per-bag artifacts stored alongside the bag or in a custom directory specified in the config file:
@@ -123,15 +132,5 @@ Indexing produces per-bag artifacts stored alongside the bag or in a custom dire
 - `.bag_chat/metadata.json` - bag metadata
 - `.bag_chat/lancedb/` - vector index
 
-## Next Step (Phase 2)
-
-Before touching code, produce a design spec + implementation plan for the `/bags` Bag Explorer page. Suggested flow:
-1. `/brainstorm` — explore layout, component decomposition, URL structure (list vs. detail), how `useSidebar` is shared across routes
-2. Save spec to `docs/superpowers/specs/YYYY-MM-DD-bag-explorer-design.md`
-3. `/plan` — write step-by-step plan to `docs/superpowers/plans/YYYY-MM-DD-bag-explorer.md`
-4. Execute via `superpowers:subagent-driven-development` or `superpowers:executing-plans`
-
-Phase 2 MUST preserve `/workspace` as a working fallback until Phase 4 completes — extract by copying components to a new route, not by moving them.
-
 ---
-**Last Updated**: 2026-04-24 (Phase 1 shipped on `frontend-refactor`; Phase 2 pending spec)
+**Last Updated**: 2026-06-10 (map-first redesign shipped)

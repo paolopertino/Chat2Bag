@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from src.core.app_config import AppConfig, get_app_config
+from src.core.index_manifest import delete_index_manifest, write_index_manifest
 from src.core.index_stamp import write_embedder_stamp, write_region_stamp
 from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
@@ -46,6 +47,10 @@ class Indexer:
 
     def build_index(self):
         """Embeds frames via the active embedder, writes LanceDB, and stamps metadata."""
+        # Clear any stale completion marker up-front so a failed/partial run can
+        # never read as indexed; it is rewritten only on the success path below.
+        delete_index_manifest(self.artifact_dir)
+
         logger.info("Loading metadata from %s...", self.metadata_path)
         with self.metadata_path.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
@@ -158,6 +163,17 @@ class Indexer:
             len(data_to_insert),
             self.embedder.name,
             self.embedder.embedding_dim,
+        )
+
+        # Final step of a successful run: the dedicated completion marker.
+        cameras = sorted({frame["topic"] for frame in frames if "topic" in frame})
+        write_index_manifest(
+            self.artifact_dir,
+            embedder_name=self.embedder.name,
+            embedder_dim=self.embedder.embedding_dim,
+            frame_count=len(data_to_insert),
+            cameras=cameras,
+            region_index=region_active,
         )
 
 

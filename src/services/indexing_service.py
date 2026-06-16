@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks
 
+from src.core.index_manifest import delete_index_manifest
+from src.core.storage import resolve_artifact_path
 from src.retriever.global_search import GlobalSearcher
 from src.services.component_factory import BackendComponentFactory
 
@@ -19,11 +21,13 @@ class IndexingService:
         status_store: MutableMapping[str, str],
         searcher: GlobalSearcher | None = None,
         region_searcher=None,
+        error_store: MutableMapping[str, str] | None = None,
     ):
         self._factory = factory
         self._status_store = status_store
         self._searcher = searcher
         self._region_searcher = region_searcher
+        self._error_store = error_store if error_store is not None else {}
 
     @staticmethod
     def resolve_and_validate_bag_path(bag_path: str) -> str:
@@ -41,12 +45,17 @@ class IndexingService:
         """Run extraction and indexing for a validated absolute bag path."""
         resolved_bag_path = str(Path(bag_path).expanduser().resolve())
         self._status_store[resolved_bag_path] = "indexing"
+        self._error_store.pop(resolved_bag_path, None)
+        # Clear any stale completion marker before extraction so a failure here
+        # (before build_index runs) cannot leave the bag reading as indexed.
+        delete_index_manifest(resolve_artifact_path(Path(resolved_bag_path)))
         try:
             parser = self._factory.create_bag_parser(resolved_bag_path)
             parser.extract_frames()
             indexer = self._factory.create_indexer(resolved_bag_path)
             indexer.build_index()
             self._status_store[resolved_bag_path] = "done"
+            self._error_store.pop(resolved_bag_path, None)
             logger.info("Successfully indexed %s", resolved_bag_path)
             if self._searcher is not None:
                 db_path = str(indexer.db_path)
@@ -56,8 +65,9 @@ class IndexingService:
                 region_dir = str(indexer.artifact_dir / "region")
                 self._region_searcher.invalidate_cache(region_dir)
                 logger.debug("Invalidated region index cache for %s", region_dir)
-        except (FileNotFoundError, OSError, RuntimeError, ValueError):
+        except Exception as exc:  # noqa: BLE001 - any failure marks the bag as errored
             self._status_store[resolved_bag_path] = "error"
+            self._error_store[resolved_bag_path] = str(exc)
             logger.exception("Indexing failed for %s", resolved_bag_path)
 
     async def queue_index_bag(

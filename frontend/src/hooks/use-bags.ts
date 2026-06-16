@@ -1,18 +1,73 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { getBagStatus, indexBag, scanBags } from "../api/client";
+import { getBagStatus, indexBag, resetIndex, scanBags } from "../api/client";
 import type { BagInfo } from "../api/types";
 
 const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
+const HIDDEN_BAGS_STORAGE_KEY = "bag_gpt_hidden_bags";
+
+function loadHiddenBags(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_BAGS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((x): x is string => typeof x === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
 
 export function useBagsState() {
   const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
   const [bags, setBags] = useState<BagInfo[]>([]);
-  const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [lastScannedRootDir, setLastScannedRootDir] = useState<string | null>(null);
+  const [scannedRoot, setScannedRoot] = useState<string | null>(null);
+  const [hiddenBagPaths, setHiddenBagPaths] = useState<Set<string>>(loadHiddenBags);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      HIDDEN_BAGS_STORAGE_KEY,
+      JSON.stringify([...hiddenBagPaths]),
+    );
+  }, [hiddenBagPaths]);
+
+  const toggleBagVisibility = useCallback((bagPath: string) => {
+    setHiddenBagPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(bagPath)) next.delete(bagPath);
+      else next.add(bagPath);
+      return next;
+    });
+  }, []);
+
+  const setBagsHidden = useCallback((bagPaths: string[], hidden: boolean) => {
+    setHiddenBagPaths((prev) => {
+      const next = new Set(prev);
+      for (const p of bagPaths) {
+        if (hidden) next.add(p);
+        else next.delete(p);
+      }
+      return next;
+    });
+  }, []);
+
+  const isBagHidden = useCallback(
+    (bagPath: string) => hiddenBagPaths.has(bagPath),
+    [hiddenBagPaths],
+  );
+
+  const visibleIndexedBagPaths = useMemo(
+    () =>
+      bags
+        .filter((b) => b.is_indexed && !hiddenBagPaths.has(b.bag_path))
+        .map((b) => b.bag_path),
+    [bags, hiddenBagPaths],
+  );
 
   const indexingBagPaths = useMemo(
     () => bags.filter((bag) => bag.status === "indexing").map((bag) => bag.bag_path),
@@ -32,10 +87,8 @@ export function useBagsState() {
     try {
       const data = await scanBags(trimmedRootDir);
       setLastScannedRootDir(trimmedRootDir);
+      setScannedRoot(data.root_dir);
       setBags(data.bags);
-      setSelectedBagPaths((prev) =>
-        prev.filter((bagPath) => data.bags.some((bag) => bag.bag_path === bagPath)),
-      );
       toast.success(`Found ${data.bags.length} bag(s).`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to scan bags.";
@@ -45,29 +98,15 @@ export function useBagsState() {
     }
   }, [rootDir]);
 
-  const toggleBagSelection = useCallback((bagPath: string) => {
-    setSelectedBagPaths((prev) => {
-      if (prev.includes(bagPath)) {
-        return prev.filter((item) => item !== bagPath);
-      }
-      return [...prev, bagPath];
-    });
-  }, []);
-
-  const toggleAllBags = useCallback(() => {
-    setSelectedBagPaths((prev) => {
-      if (prev.length === bags.length) {
-        return [];
-      }
-      return bags.map((bag) => bag.bag_path);
-    });
-  }, [bags]);
-
   const onIndex = useCallback(async (bagPath: string) => {
     try {
       await indexBag(bagPath);
       setBags((prev) =>
-        prev.map((bag) => (bag.bag_path === bagPath ? { ...bag, status: "indexing" } : bag)),
+        prev.map((bag) =>
+          bag.bag_path === bagPath
+            ? { ...bag, status: "indexing", error_message: null }
+            : bag,
+        ),
       );
       setIsPolling(true);
       toast.success("Indexing started.");
@@ -76,6 +115,18 @@ export function useBagsState() {
       toast.error(message);
     }
   }, []);
+
+  const onRetry = useCallback(
+    async (bagPath: string) => {
+      try {
+        await resetIndex(bagPath);
+      } catch {
+        // Reset is best-effort; re-indexing will overwrite the status anyway.
+      }
+      await onIndex(bagPath);
+    },
+    [onIndex],
+  );
 
   const registerBag = useCallback((bag: BagInfo) => {
     setBags((prev) => {
@@ -86,7 +137,6 @@ export function useBagsState() {
 
   const unregisterBag = useCallback((bagPath: string) => {
     setBags((prev) => prev.filter((b) => b.bag_path !== bagPath));
-    setSelectedBagPaths((prev) => prev.filter((p) => p !== bagPath));
   }, []);
 
   useEffect(() => {
@@ -137,16 +187,20 @@ export function useBagsState() {
   return {
     rootDir,
     setRootDir,
+    scannedRoot,
     bags,
-    selectedBagPaths,
     isScanning,
     isPolling,
     lastScannedRootDir,
     onScan,
     onIndex,
-    toggleBagSelection,
-    toggleAllBags,
+    onRetry,
     registerBag,
     unregisterBag,
+    hiddenBagPaths,
+    toggleBagVisibility,
+    setBagsHidden,
+    isBagHidden,
+    visibleIndexedBagPaths,
   };
 }

@@ -1,12 +1,17 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
+from src.auth.dependencies import require_current_user
 from src.core.settings import get_settings
 
-router = APIRouter(prefix="/api", tags=["images"])
+router = APIRouter(
+    prefix="/api",
+    tags=["images"],
+    dependencies=[Depends(require_current_user)],
+)
 
 _SETTINGS = get_settings()
 

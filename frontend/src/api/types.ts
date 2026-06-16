@@ -58,6 +58,15 @@ export type Area =
 export interface TrackPoint { lat: number; lon: number; timestamp_ns: number; }
 export interface TrackResponse { bag_path: string; points: TrackPoint[]; }
 
+export interface FleetTrack {
+  bag_path: string;
+  bag_name: string;
+  points: TrackPoint[];
+}
+export interface FleetTracksResponse {
+  tracks: FleetTrack[];
+}
+
 export interface HeatmapResponse {
   height: number;
   width: number;
@@ -94,10 +103,6 @@ export interface SamplesResponse {
   anchor_camera: string | null;
   sample_tolerance_ns: number;
   samples: SampleInfo[];
-}
-
-export interface ChatResponse {
-  response: string;
 }
 
 // ---- Dataset extraction types ----

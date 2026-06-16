@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.bags import router as bags_router
-from src.api.chat_routes import router as chat_router
 from src.api.datasets import router as datasets_router
 from src.api.image import router as image_router
 from src.api.indexing import router as indexing_router
@@ -25,7 +24,6 @@ def unauthenticated_client_for():
     [
         (bags_router, "GET", "/api/bags/scan?root_dir=/tmp"),
         (bags_router, "GET", "/api/bags/track?bag_path=/tmp/x"),
-        (chat_router, "POST", "/api/chat"),
         (datasets_router, "GET", "/api/datasets/jobs"),
         (image_router, "GET", "/api/image?path=/tmp/x.jpg"),
         (indexing_router, "POST", "/api/index"),

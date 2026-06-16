@@ -1,6 +1,5 @@
 import type {
   Area,
-  ChatResponse,
   BagInfoResponse,
   BagStatusResponse,
   ExtractionConfigSchema,
@@ -8,6 +7,7 @@ import type {
   ExtractionLogsResponse,
   ExtractionSubmitRequest,
   ExtractionSubmitResponse,
+  FleetTracksResponse,
   FramesResponse,
   HeatmapResponse,
   Point,
@@ -33,13 +33,6 @@ interface SimilarSearchRequest {
 
 interface IndexRequest {
   bag_path: string;
-}
-
-interface ChatRequest {
-  bag_path: string;
-  start_ns: number;
-  duration: number;
-  query: string;
 }
 
 // ---- Auth integration (token injection + 401 refresh) ----
@@ -204,6 +197,13 @@ export async function indexBag(bagPath: string): Promise<void> {
   });
 }
 
+export async function resetIndex(bagPath: string): Promise<void> {
+  await http<{ bag_path: string; status: string }>(
+    `/api/index?bag_path=${encodeURIComponent(bagPath)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getBagStatus(bagPath: string): Promise<BagStatusResponse> {
   return http<BagStatusResponse>(`/api/bags/status?bag_path=${encodeURIComponent(bagPath)}`);
 }
@@ -243,6 +243,13 @@ export async function getSamples(
 export async function getTrack(bagPath: string, stride = 1): Promise<TrackResponse> {
   const params = new URLSearchParams({ bag_path: bagPath, stride: String(stride) });
   return http<TrackResponse>(`/api/bags/track?${params.toString()}`);
+}
+
+export function fetchFleetTracks(bagPaths: string[], maxPoints = 500): Promise<FleetTracksResponse> {
+  const params = new URLSearchParams();
+  for (const p of bagPaths) params.append("bag_paths", p);
+  params.set("max_points", String(maxPoints));
+  return http<FleetTracksResponse>(`/api/bags/tracks?${params}`);
 }
 
 export async function searchMap(
@@ -287,13 +294,6 @@ export async function searchSimilar(payload: SimilarSearchRequest): Promise<Sear
   });
 }
 
-export async function chatWithClip(payload: ChatRequest): Promise<ChatResponse> {
-  return http<ChatResponse>("/api/chat", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function getExtractionSchema(): Promise<ExtractionConfigSchema> {
   return http<ExtractionConfigSchema>("/api/datasets/config/schema");
 }
@@ -330,18 +330,6 @@ export async function getExtractionLogs(jobId: string, tail = 500): Promise<stri
 
 // ---- Region search ----
 
-export async function regionSearchByText(
-  text: string,
-  bagPaths: string[],
-  topK: number,
-  area?: Area,
-): Promise<SearchResponse> {
-  return http<SearchResponse>("/api/search/region/by-text", {
-    method: "POST",
-    body: JSON.stringify({ text, bag_paths: bagPaths, top_k: topK, ...(area ? { area } : {}) }),
-  });
-}
-
 export async function regionSearchByFrame(
   supportFilePath: string,
   points: Point[],
@@ -377,16 +365,6 @@ export async function regionSearchByImage(
   return http<SearchResponse>("/api/search/region/by-image", {
     method: "POST",
     body: formData,
-  });
-}
-
-export async function regionHeatmapByText(
-  text: string,
-  targetFilePath: string,
-): Promise<HeatmapResponse> {
-  return http<HeatmapResponse>("/api/search/region/heatmap", {
-    method: "POST",
-    body: JSON.stringify({ text, target_file_path: targetFilePath }),
   });
 }
 

@@ -1,5 +1,7 @@
 # Map library: Leaflet + react-leaflet + geoman, raster OSM tiles
 
+Status: superseded by ADR-0007
+
 Map search needs a full-screen map for the user to click a point (circle) or draw
 a polygon **Area**, plus rendering of bag trajectory polylines and clustered
 result markers. The frontend has no map library today, and the map component will

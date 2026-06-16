@@ -21,3 +21,8 @@ def resolve_artifact_path(bag_path: Path) -> Path:
         if app_cfg.storage.storage_path is not None
         else bag_path / app_cfg.storage.artifact_dir
     )
+
+
+def metadata_path_for_bag(bag: Path) -> Path:
+    """Return the path to the metadata.json artifact for a bag directory."""
+    return resolve_artifact_path(bag_path=bag) / "metadata.json"

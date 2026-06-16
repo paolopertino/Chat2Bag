@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from src.utils.paths import STATE_PATH
+from src.utils.paths import ERRORS_PATH, STATE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +74,4 @@ class PersistentStatusStore(MutableMapping[str, str]):
 
 
 indexing_status = PersistentStatusStore(STATE_PATH)
+indexing_errors = PersistentStatusStore(ERRORS_PATH)

@@ -8,6 +8,7 @@ interface SearchInputProps {
   value: string;
   placeholder?: string;
   disabled?: boolean;
+  canSubmit?: boolean;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   onClear: () => void;
@@ -18,16 +19,18 @@ export function SearchInput({
   value,
   placeholder,
   disabled = false,
+  canSubmit,
   onChange,
   onSubmit,
   onClear,
   onImageUpload,
 }: SearchInputProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const submitEnabled = canSubmit ?? Boolean(value.trim());
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (disabled) return;
+    if (disabled || !submitEnabled) return;
     onSubmit(value.trim());
   };
 
@@ -86,7 +89,7 @@ export function SearchInput({
       >
         <ImagePlus className="h-4 w-4" />
       </Button>
-      <Button type="submit" disabled={disabled || !value.trim()}>
+      <Button type="submit" disabled={disabled || !submitEnabled}>
         Search
       </Button>
     </form>

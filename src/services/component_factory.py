@@ -8,7 +8,6 @@ from src.ingestion.indexer import Indexer
 from src.region.dense_indexer import DensePatchIndexer
 from src.region.region_search import RegionSearcher
 from src.retriever.global_search import GlobalSearcher
-from src.retriever.video_chat import VideoChat
 from src.services.map_search_service import MapSearchService
 
 
@@ -45,9 +44,6 @@ class BackendComponentFactory:
         if not (rc.enabled and "dense" in self._embedder.capabilities):
             return None
         return RegionSearcher(config=self._config, embedder=self._embedder)
-
-    def create_video_chat(self, bag_path: str) -> VideoChat:
-        return VideoChat(bag_path=bag_path, config=self._config)
 
     def create_map_search_service(self) -> MapSearchService:
         return MapSearchService(config=self._config)
