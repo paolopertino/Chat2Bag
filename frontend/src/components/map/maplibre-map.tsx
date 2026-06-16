@@ -54,7 +54,13 @@ export function whenStyleReady(map: maplibregl.Map, fn: () => void): void {
   });
 }
 
-export function MapLibreMap({ children }: { children?: ReactNode }) {
+export function MapLibreMap({
+  children,
+  interactive = true,
+}: {
+  children?: ReactNode;
+  interactive?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
@@ -66,6 +72,7 @@ export function MapLibreMap({ children }: { children?: ReactNode }) {
       center: [9.19, 45.46], // northern Italy; fitBounds overrides once Tracks load
       zoom: 5,
       attributionControl: { compact: true },
+      interactive,
     });
     m.once("style.load", () => {
       m.setProjection({ type: "globe" });
@@ -93,13 +100,15 @@ export function MapLibreMap({ children }: { children?: ReactNode }) {
         firstSymbolId,
       );
     });
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    if (interactive) {
+      m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    }
     setMap(m);
     return () => {
       setMap(null);
       m.remove();
     };
-  }, []);
+  }, [interactive]);
 
   return (
     <>
