@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { getBagStatus, indexBag, scanBags } from "../api/client";
+import { getBagStatus, indexBag, resetIndex, scanBags } from "../api/client";
 import type { BagInfo } from "../api/types";
 
 const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
@@ -102,7 +102,11 @@ export function useBagsState() {
     try {
       await indexBag(bagPath);
       setBags((prev) =>
-        prev.map((bag) => (bag.bag_path === bagPath ? { ...bag, status: "indexing" } : bag)),
+        prev.map((bag) =>
+          bag.bag_path === bagPath
+            ? { ...bag, status: "indexing", error_message: null }
+            : bag,
+        ),
       );
       setIsPolling(true);
       toast.success("Indexing started.");
@@ -111,6 +115,18 @@ export function useBagsState() {
       toast.error(message);
     }
   }, []);
+
+  const onRetry = useCallback(
+    async (bagPath: string) => {
+      try {
+        await resetIndex(bagPath);
+      } catch {
+        // Reset is best-effort; re-indexing will overwrite the status anyway.
+      }
+      await onIndex(bagPath);
+    },
+    [onIndex],
+  );
 
   const registerBag = useCallback((bag: BagInfo) => {
     setBags((prev) => {
@@ -178,6 +194,7 @@ export function useBagsState() {
     lastScannedRootDir,
     onScan,
     onIndex,
+    onRetry,
     registerBag,
     unregisterBag,
     hiddenBagPaths,

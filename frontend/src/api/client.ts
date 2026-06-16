@@ -197,6 +197,13 @@ export async function indexBag(bagPath: string): Promise<void> {
   });
 }
 
+export async function resetIndex(bagPath: string): Promise<void> {
+  await http<{ bag_path: string; status: string }>(
+    `/api/index?bag_path=${encodeURIComponent(bagPath)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getBagStatus(bagPath: string): Promise<BagStatusResponse> {
   return http<BagStatusResponse>(`/api/bags/status?bag_path=${encodeURIComponent(bagPath)}`);
 }
