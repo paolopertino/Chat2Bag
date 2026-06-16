@@ -13,7 +13,6 @@ _FAKE_SETTINGS = {
     "storage": {"artifact_dir": ".bag_chat", "storage_path": None},
     "embedding": {"backend": "siglip2", "model": "google/siglip2-base-patch16-naflex"},
     "models": {
-        "orchestration_llm": "gemma-2-9b",
         "model_storage": "models",
     },
     "search": {"temporal_dedup_window_sec": 20.0, "map_browse_cap": 500},

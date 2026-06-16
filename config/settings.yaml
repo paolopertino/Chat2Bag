@@ -19,7 +19,6 @@ embedding:
   encode_long_side: 896                                                                     # Shared CLS + dense encode geometry (long edge, floored to /14). Tunable; changing it re-indexes both CLS and Region.
 
 models:
-  orchestration_llm: "gemma-2-9b"
   model_storage: "models"                                                                   # Directory name where downloaded models checkpoints will be stored.
 
 search:
