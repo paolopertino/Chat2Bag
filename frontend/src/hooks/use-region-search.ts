@@ -4,15 +4,12 @@ import { toast } from "sonner";
 import {
   regionHeatmapByFrame,
   regionHeatmapByImage,
-  regionHeatmapByText,
   regionSearchByFrame,
   regionSearchByImage,
-  regionSearchByText,
 } from "../api/client";
 import type { Area, HeatmapResponse, Point, SearchResult } from "../api/types";
 
 export type RegionQuery =
-  | { kind: "text"; text: string }
   | { kind: "image"; file: File; objectUrl: string; points: Point[] }
   | { kind: "frame"; filePath: string; points: Point[] };
 
@@ -47,23 +44,6 @@ export function useRegionSearch() {
       }
     },
     [],
-  );
-
-  const runText = useCallback(
-    (text: string, bagPaths: string[], topK: number, area?: Area) => {
-      if (!text.trim()) {
-        toast.error("Enter a region query.");
-        return;
-      }
-      if (bagPaths.length === 0) {
-        toast.error("Select at least one bag.");
-        return;
-      }
-      void run({ kind: "text", text: text.trim() }, async () =>
-        (await regionSearchByText(text.trim(), bagPaths, topK, area)).results,
-      );
-    },
-    [run],
   );
 
   const runImage = useCallback(
@@ -105,18 +85,16 @@ export function useRegionSearch() {
   const rerunWithArea = useCallback(
     (bagPaths: string[], topK: number, area?: Area) => {
       if (!query) return;
-      if (query.kind === "text") runText(query.text, bagPaths, topK, area);
-      else if (query.kind === "frame") runFrame(query.filePath, query.points, bagPaths, topK, area);
+      if (query.kind === "frame") runFrame(query.filePath, query.points, bagPaths, topK, area);
       else runImage(query.file, query.objectUrl, query.points, bagPaths, topK, area);
     },
-    [query, runText, runFrame, runImage],
+    [query, runFrame, runImage],
   );
 
   const fetchHeatmap = useCallback(
     async (targetFilePath: string): Promise<HeatmapResponse | null> => {
       if (!query) return null;
       try {
-        if (query.kind === "text") return await regionHeatmapByText(query.text, targetFilePath);
         if (query.kind === "frame")
           return await regionHeatmapByFrame(query.filePath, query.points, targetFilePath);
         return await regionHeatmapByImage(query.file, query.points, targetFilePath);
@@ -133,7 +111,6 @@ export function useRegionSearch() {
     results,
     isSearching,
     unavailable,
-    runText,
     runImage,
     runFrame,
     rerunWithArea,

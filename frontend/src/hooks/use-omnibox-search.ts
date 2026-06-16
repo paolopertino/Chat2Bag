@@ -17,8 +17,6 @@ export type SupportSource =
 export interface OmniboxSearch {
   text: string;
   setText: (t: string) => void;
-  regionMode: boolean;
-  setRegionMode: (on: boolean) => void;
   support: SupportSource | null;
   points: Point[];
   setSupport: (s: SupportSource | null, points?: Point[]) => void;
@@ -54,7 +52,6 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   const region = useRegionSearch();
   const { area, setArea } = useMapArea();
   const [text, setText] = useSourceDraft(url.q);
-  const [regionMode, setRegionMode] = useState(false);
   const [support, setSupportState] = useState<SupportSource | null>(null);
   const supportRef = useRef<SupportSource | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
@@ -103,8 +100,6 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
       region.runImage(src.file, src.objectUrl, regionPoints, url.bagPaths, topK, area ?? undefined);
     } else if (src?.kind === "frame" && regionPoints.length > 0) {
       region.runFrame(src.filePath, regionPoints, url.bagPaths, topK, area ?? undefined);
-    } else if (regionMode && text.trim()) {
-      region.runText(text.trim(), url.bagPaths, topK, area ?? undefined);
     }
   }
 
@@ -151,15 +146,9 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
       return;
     }
     if (text.trim()) {
-      if (regionMode) {
-        url.clear();
-        setModality("text");
-        region.runText(text.trim(), url.bagPaths, url.topK, area ?? undefined);
-      } else {
-        region.clear();
-        setModality("text");
-        url.submitText(text.trim()); // also covers Map browse composition via URL area
-      }
+      region.clear();
+      setModality("text");
+      url.submitText(text.trim()); // also covers Map browse composition via URL area
       return;
     }
     // Empty query: Area alone = Map browse; useUrlSearch picks it up from the URL area param.
@@ -178,7 +167,6 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   function clear() {
     setText("");
     setSupport(null);
-    setRegionMode(false);
     setModality(null);
     region.clear();
     url.clear();
@@ -187,8 +175,6 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   return {
     text,
     setText,
-    regionMode,
-    setRegionMode,
     support,
     points,
     setSupport,

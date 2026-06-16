@@ -9,6 +9,10 @@ import { framesFromSample, type SupportFrame } from "../../lib/region-support";
 import { SampleGridViewer } from "../samples/sample-grid-viewer";
 import { Button } from "../ui/button";
 
+// Track previews click a GPS timestamp, not a frame timestamp — probe a window wide
+// enough to contain a nearby camera sample (mirrors the bag viewer's default window).
+const PREVIEW_WINDOW_SECONDS = 10;
+
 interface SampleResultLightboxProps {
   results: SearchResult[];
   index: number;
@@ -34,6 +38,7 @@ function resultKey(result: SearchResult): string {
 }
 
 function pickSample(samples: SampleInfo[], result: SearchResult): SampleInfo | null {
+  if (samples.length === 0) return null;
   return (
     samples.find((sample) =>
       Object.values(sample.frames_by_camera).some(
@@ -45,8 +50,14 @@ function pickSample(samples: SampleInfo[], result: SearchResult): SampleInfo | n
       || Object.values(sample.frames_by_camera).some((frame) => frame.file_path === result.file_path),
     ) ??
     samples.find((sample) => sample.timestamp_ns === result.timestamp_ns) ??
-    samples[0] ??
-    null
+    // Track previews click a GPS timestamp that rarely lands exactly on a frame, so
+    // fall back to the sample nearest the requested time rather than the first one.
+    samples.reduce((best, sample) =>
+      Math.abs(sample.timestamp_ns - result.timestamp_ns) <
+      Math.abs(best.timestamp_ns - result.timestamp_ns)
+        ? sample
+        : best,
+    )
   );
 }
 
@@ -86,7 +97,17 @@ export function SampleResultLightbox({
       error: null,
     }));
 
-    getSamples(result.bag_path, result.timestamp_ns, 1, result.file_path)
+    // A focused result (search hit) resolves to an exact frame, so a 1s probe is
+    // enough. A track preview clicks a GPS timestamp with no focus frame; camera
+    // frames are sparse (~1 FPS) and rarely fall inside a 1s forward window, so query
+    // a wider window centred on the click and let pickSample snap to the nearest sample.
+    const hasFocus = Boolean(result.file_path);
+    const durationSec = hasFocus ? 1 : PREVIEW_WINDOW_SECONDS;
+    const startNs = hasFocus
+      ? result.timestamp_ns
+      : Math.max(0, Math.floor(result.timestamp_ns - (durationSec * 1_000_000_000) / 2));
+
+    getSamples(result.bag_path, startNs, durationSec, result.file_path)
       .then((response) => {
         if (cancelled) return;
         setSampleState({

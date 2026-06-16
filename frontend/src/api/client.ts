@@ -330,18 +330,6 @@ export async function getExtractionLogs(jobId: string, tail = 500): Promise<stri
 
 // ---- Region search ----
 
-export async function regionSearchByText(
-  text: string,
-  bagPaths: string[],
-  topK: number,
-  area?: Area,
-): Promise<SearchResponse> {
-  return http<SearchResponse>("/api/search/region/by-text", {
-    method: "POST",
-    body: JSON.stringify({ text, bag_paths: bagPaths, top_k: topK, ...(area ? { area } : {}) }),
-  });
-}
-
 export async function regionSearchByFrame(
   supportFilePath: string,
   points: Point[],
@@ -377,16 +365,6 @@ export async function regionSearchByImage(
   return http<SearchResponse>("/api/search/region/by-image", {
     method: "POST",
     body: formData,
-  });
-}
-
-export async function regionHeatmapByText(
-  text: string,
-  targetFilePath: string,
-): Promise<HeatmapResponse> {
-  return http<HeatmapResponse>("/api/search/region/heatmap", {
-    method: "POST",
-    body: JSON.stringify({ text, target_file_path: targetFilePath }),
   });
 }
 

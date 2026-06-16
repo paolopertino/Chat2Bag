@@ -14,18 +14,48 @@ export function trackColor(index: number): string {
   return PALETTE[index % PALETTE.length];
 }
 
-/** timestamp_ns of the track point nearest to a clicked lng/lat (equirectangular approx). */
+/**
+ * timestamp_ns of the point on the track *line* nearest to a clicked lng/lat
+ * (equirectangular approx). We project the click onto each polyline segment and
+ * interpolate the timestamp along the nearest one — not onto the nearest vertex.
+ *
+ * Tracks are decimated to ~500 points (see /api/bags/tracks), so vertices are sparse
+ * along the path. Snapping to the nearest *vertex* makes two spatially-separate passes
+ * over the same road collapse to the same point (the cross-track gap between the passes
+ * is smaller than the along-track spacing between surviving vertices), so clicking
+ * either line returned the same timestamp. Projecting onto segments distinguishes the
+ * passes the same way the rendered lines do.
+ */
 function nearestTimestampNs(track: FleetTrack, lng: number, lat: number): number | undefined {
+  const pts = track.points;
+  if (pts.length === 0) return undefined;
+  if (pts.length === 1) return pts[0].timestamp_ns;
+
+  // Scale longitude by cos(lat) so distances are ~isotropic in this local frame.
   const cosLat = Math.cos((lat * Math.PI) / 180);
-  let bestTs: number | undefined;
+  const cx = lng * cosLat;
+  const cy = lat;
+
   let bestDist = Infinity;
-  for (const p of track.points) {
-    const dx = (p.lon - lng) * cosLat;
-    const dy = p.lat - lat;
+  let bestTs = pts[0].timestamp_ns;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const ax = a.lon * cosLat;
+    const ay = a.lat;
+    const vx = b.lon * cosLat - ax;
+    const vy = b.lat - ay;
+    const len2 = vx * vx + vy * vy;
+    // Projection fraction of the click onto segment [a, b], clamped to the segment.
+    let t = len2 > 0 ? ((cx - ax) * vx + (cy - ay) * vy) / len2 : 0;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    const dx = cx - (ax + t * vx);
+    const dy = cy - (ay + t * vy);
     const dist = dx * dx + dy * dy;
     if (dist < bestDist) {
       bestDist = dist;
-      bestTs = p.timestamp_ns;
+      bestTs = Math.round(a.timestamp_ns + (b.timestamp_ns - a.timestamp_ns) * t);
     }
   }
   return bestTs;

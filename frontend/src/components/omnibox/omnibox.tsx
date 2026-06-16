@@ -1,4 +1,3 @@
-import { Crosshair } from "lucide-react";
 import { useState } from "react";
 
 import type { OmniboxSearch, SupportSource } from "../../hooks/use-omnibox-search";
@@ -72,20 +71,7 @@ export function Omnibox({
             onEdit={() => setDialogOpen(true)}
             onClear={() => search.setSupport(null)}
           />
-        ) : (
-          <button
-            className={
-              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs " +
-              (search.regionMode
-                ? "border-sky-400/70 bg-sky-400/15"
-                : "border-[var(--line)] opacity-60")
-            }
-            onClick={() => search.setRegionMode(!search.regionMode)}
-            title="Region search: rank by the best-matching Patch instead of the whole Frame"
-          >
-            <Crosshair className="h-3 w-3" /> region
-          </button>
-        )}
+        ) : null}
 
         {showAreaChip ? (
           <AreaDrawChip
