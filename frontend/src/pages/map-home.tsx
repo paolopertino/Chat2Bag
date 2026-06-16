@@ -104,7 +104,9 @@ export function MapHomePage() {
         onSelect={setLightboxIndex}
         onLoadMore={search.loadMore}
         isSearching={search.isSearching}
-        className="absolute inset-x-4 bottom-4 z-10"
+        className={
+          "absolute bottom-4 right-14 z-10 " + (sidebarOpen ? "left-[20rem]" : "left-4")
+        }
       />
       <MapSidePanel
         open={sidebarOpen}
