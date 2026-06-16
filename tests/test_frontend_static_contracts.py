@@ -5,23 +5,25 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_sample_lightbox_heatmap_fetch_effect_does_not_self_cancel():
+def test_heatmap_fetch_effect_does_not_self_cancel():
+    # The lazy heatmap-fetch effect (extracted into the use-heatmaps hook) must
+    # not list the accumulated state in its dependency array, or it would re-run
+    # on every fetch and cancel itself; results are tracked via a ref instead.
     source = (
         ROOT
         / "frontend"
         / "src"
-        / "components"
-        / "search"
-        / "sample-result-lightbox.tsx"
+        / "hooks"
+        / "use-heatmaps.ts"
     ).read_text(encoding="utf-8")
-    start = source.index('if (!showHeatmaps || !fetchHeatmap')
-    effect_tail = source[start:source.index("  useEffect(() => {\n    const onKey", start)]
-    match = re.search(r"\}, \[([^\]]*)\]\);", effect_tail)
+    start = source.index("if (!enabled || !fetchHeatmap")
+    match = re.search(r"\}, \[([^\]]*)\]\);", source[start:])
 
     assert match is not None
     dependencies = {part.strip() for part in match.group(1).split(",")}
     assert "heatmaps" not in dependencies
     assert "heatmapLoading" not in dependencies
+    assert "heatmapsRef" in source
 
 
 def test_omnibox_confirms_region_support_with_explicit_points():
@@ -41,13 +43,15 @@ def test_omnibox_confirms_region_support_with_explicit_points():
         / "omnibox.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "submitSupportRegion: (points: Point[]) => void;" in hook
-    assert "function submitSupportRegion(nextPoints: Point[])" in hook
-    assert "runRegion(url.topK, nextPoints)" in hook
-    assert "region.runImage(support.file, support.objectUrl, regionPoints" in hook
-    assert "region.runFrame(support.filePath, regionPoints" in hook
-    assert "search.submitSupportRegion(points)" in component
-    assert "search.setPoints(points);\n            setSupportDialogOpen(false);\n            if (points.length > 0) search.submit();" not in component
+    # Region support is confirmed with the points passed explicitly into
+    # submitSupportRegion (plus the optionally switched camera frame), rather
+    # than reading stale `search.points` state.
+    assert "submitSupportRegion: (points: Point[], chosenFilePath?: string) => void;" in hook
+    assert "function submitSupportRegion(nextPoints: Point[], chosenFilePath?: string)" in hook
+    assert "runRegionWith(effective, url.topK, nextPoints)" in hook
+    assert "region.runImage(src.file, src.objectUrl, regionPoints" in hook
+    assert "region.runFrame(src.filePath, regionPoints" in hook
+    assert "search.submitSupportRegion(points, chosenFilePath)" in component
 
 
 def test_search_input_allows_explicit_non_text_submit_enablement():
