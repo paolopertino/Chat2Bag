@@ -4,6 +4,7 @@ import type { Area, Point, SearchResult } from "../api/types";
 import type { SupportFrame } from "../lib/region-support";
 import { useMapArea } from "./use-map-area";
 import { useRegionSearch } from "./use-region-search";
+import { useSearchThresholds } from "./use-search-thresholds";
 import { useSourceDraft } from "./use-source-draft";
 import { useUrlSearch } from "./use-url-search";
 
@@ -27,8 +28,12 @@ export interface OmniboxSearch {
   bagPaths: string[];
   topK: number;
   setTopK: (k: number) => void;
-  minScore: number;
-  setMinScore: (s: number) => void;
+  textThreshold: number;
+  visualThreshold: number;
+  setTextThreshold: (v: number) => void;
+  setVisualThreshold: (v: number) => void;
+  activeThreshold: number;
+  modality: "text" | "visual" | null;
   results: SearchResult[];
   isSearching: boolean;
   rawResultCount: number;
@@ -54,6 +59,10 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   const supportRef = useRef<SupportSource | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
 
+  const thresholds = useSearchThresholds();
+  const [modality, setModality] = useState<"text" | "visual" | null>(null);
+  const activeThreshold = modality === "visual" ? thresholds.visual : thresholds.text;
+
   const setSupport = useCallback((next: SupportSource | null, nextPoints: Point[] = []) => {
     const previous = supportRef.current;
     if (
@@ -76,11 +85,8 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   );
 
   const regionActive = region.query !== null;
-  // useUrlSearch already applies the min-similarity filter to global/browse
-  // results; region results bypass it, so apply the same threshold here.
-  const results = regionActive
-    ? region.results.filter((r) => (r.similarity_score ?? 1) >= url.minScore)
-    : url.results;
+  const rawResults = regionActive ? region.results : url.results;
+  const results = rawResults.filter((r) => (r.similarity_score ?? 1) >= activeThreshold);
   const rawResultCount = regionActive ? region.results.length : url.rawResultCount;
   const activeKind: OmniboxSearch["activeKind"] = regionActive
     ? "region"
@@ -117,7 +123,16 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     } else {
       setPoints(nextPoints);
     }
-    if (!effective || nextPoints.length === 0) return;
+    if (!effective) return;
+
+    setModality("visual");
+    if (nextPoints.length === 0) {
+      // No region points placed → run a whole-frame (global) search.
+      region.clear();
+      if (effective.kind === "upload") void url.submitImage(effective.file);
+      else url.submitSimilar(effective.filePath);
+      return;
+    }
     url.clear();
     runRegionWith(effective, url.topK, nextPoints);
   }
@@ -125,26 +140,31 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
   function submit() {
     if (support && points.length > 0) {
       url.clear();
+      setModality("visual");
       runRegion(url.topK);
       return;
     }
     if (support?.kind === "upload") {
       region.clear();
+      setModality("visual");
       void url.submitImage(support.file); // Global image search
       return;
     }
     if (text.trim()) {
       if (regionMode) {
         url.clear();
+        setModality("text");
         region.runText(text.trim(), url.bagPaths, url.topK, area ?? undefined);
       } else {
         region.clear();
+        setModality("text");
         url.submitText(text.trim()); // also covers Map browse composition via URL area
       }
       return;
     }
     // Empty query: Area alone = Map browse; useUrlSearch picks it up from the URL area param.
     region.clear();
+    setModality(null);
     url.submitText("");
   }
 
@@ -159,6 +179,7 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     setText("");
     setSupport(null);
     setRegionMode(false);
+    setModality(null);
     region.clear();
     url.clear();
   }
@@ -177,8 +198,12 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     bagPaths: url.bagPaths,
     topK: url.topK,
     setTopK: url.setTopK,
-    minScore: url.minScore,
-    setMinScore: url.setMinScore,
+    textThreshold: thresholds.text,
+    visualThreshold: thresholds.visual,
+    setTextThreshold: thresholds.setText,
+    setVisualThreshold: thresholds.setVisual,
+    activeThreshold,
+    modality,
     results,
     isSearching: url.isSearching || region.isSearching,
     rawResultCount,

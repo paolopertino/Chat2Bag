@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 
 interface FilterChipProps {
   topK: number;
-  minScore?: number;
+  /** The threshold in effect for the current search modality (display only). */
+  activeThreshold: number;
+  textThreshold: number;
+  visualThreshold: number;
   /** Total raw hits returned from backend (before client-side filter). */
   rawResultCount: number;
   /** How many bags were searched (display only). */
@@ -11,17 +14,21 @@ interface FilterChipProps {
   /** Whether to show the topK slider (false on per-bag search). */
   showTopK?: boolean;
   onTopKChange: (k: number) => void;
-  onMinScoreChange?: (s: number) => void;
+  onTextThresholdChange: (s: number) => void;
+  onVisualThresholdChange: (s: number) => void;
 }
 
 export function FilterChip({
   topK,
-  minScore,
+  activeThreshold,
+  textThreshold,
+  visualThreshold,
   rawResultCount,
   bagCount,
   showTopK = true,
   onTopKChange,
-  onMinScoreChange,
+  onTextThresholdChange,
+  onVisualThresholdChange,
 }: FilterChipProps) {
   const [expanded, setExpanded] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -49,9 +56,9 @@ export function FilterChip({
               K=<strong>{topK}</strong>
             </span>
           ) : null}
-          {minScore !== undefined ? (
-            <span>≥<strong>{minScore.toFixed(2)}</strong></span>
-          ) : null}
+          <span>
+            ≥<strong>{activeThreshold.toFixed(2)}</strong>
+          </span>
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -70,7 +77,7 @@ export function FilterChip({
       {expanded ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {showTopK ? (
-            <label className="block">
+            <label className="block sm:col-span-2">
               <span className="mb-1 block text-[var(--ink-soft)]">Top K: {topK}</span>
               <input
                 type="range"
@@ -82,22 +89,34 @@ export function FilterChip({
               />
             </label>
           ) : null}
-          {minScore !== undefined && onMinScoreChange ? (
-            <label className="block">
-              <span className="mb-1 block text-[var(--ink-soft)]">
-                Min similarity: {minScore.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={minScore}
-                onChange={(e) => onMinScoreChange(Number(e.target.value))}
-                className="w-full accent-[var(--teal)]"
-              />
-            </label>
-          ) : null}
+          <label className="block">
+            <span className="mb-1 block text-[var(--ink-soft)]">
+              Text min: {textThreshold.toFixed(2)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={textThreshold}
+              onChange={(e) => onTextThresholdChange(Number(e.target.value))}
+              className="w-full accent-[var(--teal)]"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[var(--ink-soft)]">
+              Visual min: {visualThreshold.toFixed(2)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={visualThreshold}
+              onChange={(e) => onVisualThresholdChange(Number(e.target.value))}
+              className="w-full accent-[var(--teal)]"
+            />
+          </label>
         </div>
       ) : null}
     </div>

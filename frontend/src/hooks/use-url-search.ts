@@ -7,7 +7,6 @@ import { decodeArea } from "../lib/area-codec";
 import type { Area } from "../api/types";
 
 const TOP_K_DEFAULT = 100;
-const MIN_SCORE_DEFAULT = 0;
 const TOP_K_MIN = 1;
 const TOP_K_MAX = 500;
 
@@ -37,28 +36,22 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
   const similar = searchParams.get("similar") ?? "";
   const area: Area | null = decodeArea(searchParams.get("area"));
   const rawTopKStr = searchParams.get("topK");
-  const rawMinScoreStr = searchParams.get("minScore");
   const rawTopK = rawTopKStr !== null ? Number(rawTopKStr) : NaN;
-  const rawMinScore = rawMinScoreStr !== null ? Number(rawMinScoreStr) : NaN;
   const topK = clamp(Number.isFinite(rawTopK) ? rawTopK : topKDefault, TOP_K_MIN, TOP_K_MAX);
-  const minScore = clamp(Number.isFinite(rawMinScore) ? rawMinScore : MIN_SCORE_DEFAULT, 0, 1);
 
-  // Write clamped values back when URL params are out of range (replace history entry).
+  // Write the clamped topK back when the URL param is out of range (replace history entry).
   useEffect(() => {
-    const patches: Record<string, string> = {};
-    if (rawTopKStr && String(topK) !== rawTopKStr) patches.topK = String(topK);
-    if (rawMinScoreStr && String(minScore) !== rawMinScoreStr) patches.minScore = String(minScore);
-    if (Object.keys(patches).length === 0) return;
+    if (!rawTopKStr || String(topK) === rawTopKStr) return;
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        for (const [k, v] of Object.entries(patches)) next.set(k, v);
+        next.set("topK", String(topK));
         return next;
       },
       { replace: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawTopKStr, rawMinScoreStr]);
+  }, [rawTopKStr]);
 
   // Effective bag paths sent to the search backend.
   // Priority: scope override (per-bag search) > visible indexed bags (default).
@@ -135,29 +128,14 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     [writeUrl],
   );
 
-  const setMinScore = useCallback(
-    (s: number) => {
-      const clamped = clamp(s, 0, 1);
-      writeUrl({ minScore: String(clamped) });
-    },
-    [writeUrl],
-  );
-
-  // Client-side score filter
-  const filteredResults = useMemo(
-    () => search.results.filter((r) => (r.similarity_score ?? 1) >= minScore),
-    [search.results, minScore],
-  );
-
   return {
     q,
     similar,
     topK,
-    minScore,
     area,
     /** Effective bag PATHS for the fetch (scope override; or all visible indexed by default). */
     bagPaths: effectiveBagPaths,
-    results: filteredResults,
+    results: search.results,
     rawResultCount: search.results.length,
     isSearching: search.isSearching,
     submitText,
@@ -165,6 +143,5 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     submitSimilar,
     clear,
     setTopK,
-    setMinScore,
   };
 }

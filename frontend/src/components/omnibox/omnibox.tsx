@@ -98,11 +98,14 @@ export function Omnibox({
 
         <FilterChip
           topK={search.topK}
-          minScore={search.minScore}
+          activeThreshold={search.activeThreshold}
+          textThreshold={search.textThreshold}
+          visualThreshold={search.visualThreshold}
           rawResultCount={search.rawResultCount}
           bagCount={search.bagPaths.length}
           onTopKChange={search.setTopK}
-          onMinScoreChange={search.setMinScore}
+          onTextThresholdChange={search.setTextThreshold}
+          onVisualThresholdChange={search.setVisualThreshold}
         />
       </div>
 
