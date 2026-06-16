@@ -1,6 +1,14 @@
-import requests
 import json
 import time
+
+import pytest
+import requests
+
+# Manual integration smoke script — NOT part of the automated unit suite. Its
+# `test_*` functions POST to a live server at :8000 (run directly with
+# `python tests/test_api.py`). Skipped during pytest collection so a stopped
+# server can't fail the suite.
+pytestmark = pytest.mark.skip(reason="manual integration script; requires a live server at :8000")
 
 BASE_URL = "http://127.0.0.1:8000/api"
 
