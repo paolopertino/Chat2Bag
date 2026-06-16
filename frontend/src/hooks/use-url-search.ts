@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
 
 import { useSearch } from "./use-search";
 import { useBags } from "../context/bags-context";
-import { decodeBagId } from "../lib/bag-id";
 import { decodeArea } from "../lib/area-codec";
 import type { Area } from "../api/types";
 
@@ -15,27 +13,6 @@ const TOP_K_MAX = 500;
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi);
-}
-
-function parseBags(value: string | null): string[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function decodeBagIds(ids: string[]): { paths: string[]; malformedCount: number } {
-  const paths: string[] = [];
-  let malformedCount = 0;
-  for (const id of ids) {
-    try {
-      paths.push(decodeBagId(id));
-    } catch {
-      malformedCount++;
-    }
-  }
-  return { paths, malformedCount };
 }
 
 interface UseUrlSearchOptions {
@@ -52,14 +29,8 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
   const { topKDefault = TOP_K_DEFAULT } = options;
   const [searchParams, setSearchParams] = useSearchParams();
   const search = useSearch();
-  const { bags } = useBags();
+  const { visibleIndexedBagPaths } = useBags();
   const lastFetchKeyRef = useRef<string>("");
-
-  // All indexed bag paths — the fallback when no explicit selection is in the URL.
-  const allIndexedBagPaths = useMemo(
-    () => bags.filter((b) => b.is_indexed).map((b) => b.bag_path),
-    [bags],
-  );
 
   // Read URL state, with normalization
   const q = searchParams.get("q") ?? "";
@@ -89,35 +60,11 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawTopKStr, rawMinScoreStr]);
 
-  // urlBags = raw encoded IDs (used by the chip for selection state).
-  const urlBags = useMemo(() => parseBags(searchParams.get("bags")), [searchParams]);
-
-  // bagPaths from URL = decoded paths (used by the API).
-  const { paths: bagPathsFromUrl, malformedCount } = useMemo(
-    () => decodeBagIds(urlBags),
-    [urlBags],
-  );
-
-  // Toast when malformed bag IDs are encountered in the URL.
-  useEffect(() => {
-    if (malformedCount > 0) {
-      toast.error(
-        `${malformedCount} bag ID${malformedCount === 1 ? "" : "s"} in the URL could not be decoded and ${malformedCount === 1 ? "was" : "were"} skipped.`,
-      );
-    }
-  }, [malformedCount]);
-
   // Effective bag paths sent to the search backend.
-  // Priority: scope override > explicit URL bags > all indexed (spec default).
-  // Wrapped in useMemo so identity is stable — callers must memoize options.scope.
+  // Priority: scope override (per-bag search) > visible indexed bags (default).
   const effectiveBagPaths = useMemo(
-    () =>
-      options.scope
-        ? options.scope.bagPaths
-        : bagPathsFromUrl.length > 0
-          ? bagPathsFromUrl
-          : allIndexedBagPaths,
-    [options.scope, bagPathsFromUrl, allIndexedBagPaths],
+    () => (options.scope ? options.scope.bagPaths : visibleIndexedBagPaths),
+    [options.scope, visibleIndexedBagPaths],
   );
 
   const writeUrl = useCallback(
@@ -196,14 +143,6 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     [writeUrl],
   );
 
-  /** Update URL bags param. Pass an empty array to clear → "all indexed" semantics. */
-  const setBags = useCallback(
-    (bagIds: string[]) => {
-      writeUrl({ bags: bagIds.length === 0 ? null : bagIds.join(",") });
-    },
-    [writeUrl],
-  );
-
   // Client-side score filter
   const filteredResults = useMemo(
     () => search.results.filter((r) => (r.similarity_score ?? 1) >= minScore),
@@ -216,10 +155,8 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     topK,
     minScore,
     area,
-    /** Effective bag PATHS for the fetch (decoded; or scope override; or all indexed by default). */
+    /** Effective bag PATHS for the fetch (scope override; or all visible indexed by default). */
     bagPaths: effectiveBagPaths,
-    /** Raw encoded bag IDs from the URL (for the chip's selection state). */
-    urlBags,
     results: filteredResults,
     rawResultCount: search.results.length,
     isSearching: search.isSearching,
@@ -229,6 +166,5 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
     clear,
     setTopK,
     setMinScore,
-    setBags,
   };
 }

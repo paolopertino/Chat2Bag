@@ -25,8 +25,6 @@ export interface OmniboxSearch {
   area: Area | null;
   setArea: (a: Area | null) => void;
   bagPaths: string[];
-  urlBags: string[];
-  setBags: (ids: string[]) => void;
   topK: number;
   setTopK: (k: number) => void;
   minScore: number;
@@ -177,8 +175,6 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     area,
     setArea,
     bagPaths: url.bagPaths,
-    urlBags: url.urlBags,
-    setBags: url.setBags,
     topK: url.topK,
     setTopK: url.setTopK,
     minScore: url.minScore,

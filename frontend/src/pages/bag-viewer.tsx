@@ -94,7 +94,6 @@ export function BagViewerPage() {
         <Omnibox
           search={search}
           showAreaChip={false}
-          showBagChip={false}
           className="min-w-0 flex-1"
           supportDialogOpen={supportDialogOpen}
           onSupportDialogOpenChange={setSupportDialogOpen}

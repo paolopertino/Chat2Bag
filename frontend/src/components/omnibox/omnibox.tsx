@@ -2,7 +2,6 @@ import { Crosshair } from "lucide-react";
 import { useState } from "react";
 
 import type { OmniboxSearch, SupportSource } from "../../hooks/use-omnibox-search";
-import { BagPickerChip } from "../search/bag-picker-chip";
 import { FilterChip } from "../search/filter-chip";
 import { RegionSupportDialog, type RegionSupport } from "../search/region-support-dialog";
 import { SearchInput } from "../search/search-input";
@@ -13,8 +12,6 @@ interface OmniboxProps {
   search: OmniboxSearch;
   /** Hidden in the Bag viewer (no map to draw on). */
   showAreaChip?: boolean;
-  /** Hidden in the Bag viewer (scope is pinned). */
-  showBagChip?: boolean;
   onStartAreaDraw?: (kind: "circle" | "polygon") => void;
   /** The draw tool currently armed (drives the Area chip's "drawing…" state). */
   drawMode?: "circle" | "polygon" | null;
@@ -27,7 +24,6 @@ interface OmniboxProps {
 export function Omnibox({
   search,
   showAreaChip = true,
-  showBagChip = true,
   onStartAreaDraw,
   drawMode = null,
   supportDialogOpen: externalDialogOpen,
@@ -97,13 +93,6 @@ export function Omnibox({
             drawing={drawMode !== null}
             onClear={() => search.setArea(null)}
             onStartDraw={(kind) => onStartAreaDraw?.(kind)}
-          />
-        ) : null}
-
-        {showBagChip ? (
-          <BagPickerChip
-            selectedBagIds={search.urlBags}
-            onChange={search.setBags}
           />
         ) : null}
 

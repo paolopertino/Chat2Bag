@@ -23,8 +23,7 @@ import type { SearchResult } from "../api/types";
 export function MapHomePage() {
   const navigate = useNavigate();
   const bagsState = useBags();
-  const indexedPaths = bagsState.bags.filter((b) => b.is_indexed).map((b) => b.bag_path);
-  const { tracks } = useFleetTracks(indexedPaths);
+  const { tracks } = useFleetTracks(bagsState.visibleIndexedBagPaths);
   const [hoveredBagPath, setHoveredBagPath] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState<"circle" | "polygon" | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
