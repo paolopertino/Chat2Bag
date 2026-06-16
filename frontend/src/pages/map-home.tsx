@@ -15,14 +15,14 @@ import { SampleResultLightbox } from "../components/search/sample-result-lightbo
 import { ExtractDialog } from "../components/extract/extract-dialog";
 import { JobsTab } from "../components/map/jobs-tab";
 import { encodeBagId } from "../lib/bag-id";
-import { useBagsState } from "../hooks/use-bags";
+import { useBags } from "../context/bags-context";
 import { useFleetTracks } from "../hooks/use-fleet-tracks";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import type { SearchResult } from "../api/types";
 
 export function MapHomePage() {
   const navigate = useNavigate();
-  const bagsState = useBagsState();
+  const bagsState = useBags();
   const indexedPaths = bagsState.bags.filter((b) => b.is_indexed).map((b) => b.bag_path);
   const { tracks } = useFleetTracks(indexedPaths);
   const [hoveredBagPath, setHoveredBagPath] = useState<string | null>(null);

@@ -9,10 +9,10 @@ const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
 export function useBagsState() {
   const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
   const [bags, setBags] = useState<BagInfo[]>([]);
-  const [selectedBagPaths, setSelectedBagPaths] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [lastScannedRootDir, setLastScannedRootDir] = useState<string | null>(null);
+  const [scannedRoot, setScannedRoot] = useState<string | null>(null);
 
   const indexingBagPaths = useMemo(
     () => bags.filter((bag) => bag.status === "indexing").map((bag) => bag.bag_path),
@@ -32,10 +32,8 @@ export function useBagsState() {
     try {
       const data = await scanBags(trimmedRootDir);
       setLastScannedRootDir(trimmedRootDir);
+      setScannedRoot(data.root_dir);
       setBags(data.bags);
-      setSelectedBagPaths((prev) =>
-        prev.filter((bagPath) => data.bags.some((bag) => bag.bag_path === bagPath)),
-      );
       toast.success(`Found ${data.bags.length} bag(s).`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to scan bags.";
@@ -44,24 +42,6 @@ export function useBagsState() {
       setIsScanning(false);
     }
   }, [rootDir]);
-
-  const toggleBagSelection = useCallback((bagPath: string) => {
-    setSelectedBagPaths((prev) => {
-      if (prev.includes(bagPath)) {
-        return prev.filter((item) => item !== bagPath);
-      }
-      return [...prev, bagPath];
-    });
-  }, []);
-
-  const toggleAllBags = useCallback(() => {
-    setSelectedBagPaths((prev) => {
-      if (prev.length === bags.length) {
-        return [];
-      }
-      return bags.map((bag) => bag.bag_path);
-    });
-  }, [bags]);
 
   const onIndex = useCallback(async (bagPath: string) => {
     try {
@@ -86,7 +66,6 @@ export function useBagsState() {
 
   const unregisterBag = useCallback((bagPath: string) => {
     setBags((prev) => prev.filter((b) => b.bag_path !== bagPath));
-    setSelectedBagPaths((prev) => prev.filter((p) => p !== bagPath));
   }, []);
 
   useEffect(() => {
@@ -137,15 +116,13 @@ export function useBagsState() {
   return {
     rootDir,
     setRootDir,
+    scannedRoot,
     bags,
-    selectedBagPaths,
     isScanning,
     isPolling,
     lastScannedRootDir,
     onScan,
     onIndex,
-    toggleBagSelection,
-    toggleAllBags,
     registerBag,
     unregisterBag,
   };
