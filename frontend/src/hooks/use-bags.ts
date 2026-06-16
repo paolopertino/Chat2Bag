@@ -5,6 +5,20 @@ import { getBagStatus, indexBag, scanBags } from "../api/client";
 import type { BagInfo } from "../api/types";
 
 const ROOT_DIR_STORAGE_KEY = "bag_gpt_root_dir";
+const HIDDEN_BAGS_STORAGE_KEY = "bag_gpt_hidden_bags";
+
+function loadHiddenBags(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_BAGS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((x): x is string => typeof x === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
 
 export function useBagsState() {
   const [rootDir, setRootDir] = useState(() => window.localStorage.getItem(ROOT_DIR_STORAGE_KEY) ?? "");
@@ -13,6 +27,47 @@ export function useBagsState() {
   const [isPolling, setIsPolling] = useState(false);
   const [lastScannedRootDir, setLastScannedRootDir] = useState<string | null>(null);
   const [scannedRoot, setScannedRoot] = useState<string | null>(null);
+  const [hiddenBagPaths, setHiddenBagPaths] = useState<Set<string>>(loadHiddenBags);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      HIDDEN_BAGS_STORAGE_KEY,
+      JSON.stringify([...hiddenBagPaths]),
+    );
+  }, [hiddenBagPaths]);
+
+  const toggleBagVisibility = useCallback((bagPath: string) => {
+    setHiddenBagPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(bagPath)) next.delete(bagPath);
+      else next.add(bagPath);
+      return next;
+    });
+  }, []);
+
+  const setBagsHidden = useCallback((bagPaths: string[], hidden: boolean) => {
+    setHiddenBagPaths((prev) => {
+      const next = new Set(prev);
+      for (const p of bagPaths) {
+        if (hidden) next.add(p);
+        else next.delete(p);
+      }
+      return next;
+    });
+  }, []);
+
+  const isBagHidden = useCallback(
+    (bagPath: string) => hiddenBagPaths.has(bagPath),
+    [hiddenBagPaths],
+  );
+
+  const visibleIndexedBagPaths = useMemo(
+    () =>
+      bags
+        .filter((b) => b.is_indexed && !hiddenBagPaths.has(b.bag_path))
+        .map((b) => b.bag_path),
+    [bags, hiddenBagPaths],
+  );
 
   const indexingBagPaths = useMemo(
     () => bags.filter((bag) => bag.status === "indexing").map((bag) => bag.bag_path),
@@ -125,5 +180,10 @@ export function useBagsState() {
     onIndex,
     registerBag,
     unregisterBag,
+    hiddenBagPaths,
+    toggleBagVisibility,
+    setBagsHidden,
+    isBagHidden,
+    visibleIndexedBagPaths,
   };
 }
