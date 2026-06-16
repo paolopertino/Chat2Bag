@@ -152,9 +152,8 @@ export function RegionSupportDialog({
               type="button"
               size="sm"
               onClick={() => onConfirm(points, selected ?? undefined)}
-              disabled={points.length === 0}
             >
-              Done
+              {points.length === 0 ? "Global search" : "Region search"}
             </Button>
           </div>
         </div>
