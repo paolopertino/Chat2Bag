@@ -161,14 +161,17 @@ async def scan_bags(
 
     bags: List[Dict[str, Any]] = []
     for candidate in sorted(bag_dirs, key=lambda p: str(p.resolve())):
-        lancedb_dir = _artifact_dir_for_bag(candidate) / "lancedb"
+        artifact_dir = _artifact_dir_for_bag(candidate)
+        # Lazy heal legacy indexes (raw or index-only) into a manifest.
+        ensure_manifest(artifact_dir)
         bag_path = str(candidate.resolve())
         stamp = read_gps_stamp(_metadata_path_for_bag(candidate))
         bags.append(
             {
                 "bag_path": bag_path,
                 "bag_name": candidate.name,
-                "is_indexed": lancedb_dir.exists() and lancedb_dir.is_dir(),
+                "is_indexed": bag_is_indexed(artifact_dir),
+                "has_raw_data": _has_raw_bag(candidate),
                 "status": indexing_status.get(bag_path, "idle"),
                 "is_located": gps_is_located(stamp),
                 "located_frame_count": int(stamp.get("located_frame_count", 0)) if stamp else 0,
@@ -188,11 +191,10 @@ async def bag_status(
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
     resolved_path = str(path)
-    lancedb_dir = _artifact_dir_for_bag(path) / "lancedb"
     status = indexing_status.get(resolved_path)
 
     if status is None:
-        status = "done" if lancedb_dir.exists() and lancedb_dir.is_dir() else "idle"
+        status = "done" if bag_is_indexed(_artifact_dir_for_bag(path)) else "idle"
 
     return {
         "bag_path": resolved_path,
