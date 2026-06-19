@@ -91,7 +91,7 @@ dependencies = [
     { name = "accelerate" },
     { name = "aiosqlite" },
     { name = "bcrypt" },
-    { name = "data-extraction-lib" },
+    { name = "data-extraction-lib", extra = ["embedding"] },
     { name = "faiss-cpu" },
     { name = "fastapi" },
     { name = "lancedb" },
@@ -129,7 +129,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.12.0" },
     { name = "aiosqlite", specifier = ">=0.20.0" },
     { name = "bcrypt", specifier = "<4" },
-    { name = "data-extraction-lib", editable = "../data-extraction-lib" },
+    { name = "data-extraction-lib", extras = ["embedding"], editable = "../data-extraction-lib" },
     { name = "faiss-cpu", specifier = ">=1.14.2" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "lancedb", specifier = ">=0.27.1" },
@@ -472,7 +472,23 @@ name = "data-extraction-lib"
 version = "0.1.0"
 source = { editable = "../data-extraction-lib" }
 
+[package.optional-dependencies]
+embedding = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pillow" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+
 [package.metadata]
+requires-dist = [
+    { name = "numpy", marker = "extra == 'embedding'" },
+    { name = "pillow", marker = "extra == 'embedding'" },
+    { name = "torch", marker = "extra == 'embedding'" },
+    { name = "transformers", marker = "extra == 'embedding'" },
+]
+provides-extras = ["embedding"]
 
 [package.metadata.requires-dev]
 dev = [
