@@ -12,7 +12,7 @@ from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_stamp_compatible, read_embedder_stamp
 from src.core.storage import resolve_artifact_path
 from src.embedding import FrameEmbedder, create_embedder
-from src.geo.area import area_from_payload
+from src.geo.area_payload import parse_area_payload
 from src.geo.locator import resolve_area_to_frames
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ class GlobalSearcher:
         if exclude_file_path:
             exclude_path = str(Path(exclude_file_path).expanduser().resolve())
 
-        area_obj = area_from_payload(area)
+        area_obj = parse_area_payload(area)
         in_area: dict[str, set[str]] | None = None
         if area_obj is not None:
             in_area = {

@@ -475,7 +475,10 @@ source = { editable = "../data-extraction-lib" }
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.0" }]
+dev = [
+    { name = "pytest", specifier = ">=9.1.0" },
+    { name = "ruff", specifier = ">=0.15.18" },
+]
 
 [[package]]
 name = "deprecation"

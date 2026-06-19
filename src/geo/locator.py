@@ -1,10 +1,21 @@
-"""Resolve an Area to the in-area Frame set per bag (reads metadata.json)."""
+"""Resolve an Area to the in-area Frame set per bag (reads metadata.json).
+
+Geometry + containment live in `data_extraction_lib.geo`; this module is the thin
+webapp glue that reads metadata.json off disk (via the app's storage policy) and
+maps each frame's GPS to a library `Coordinate` to test `Area` membership.
+
+`LocatedFrame` stays app-side on purpose: `topic` (ROS2), `file_path` (artifact
+storage) and `timestamp_ns` (bag) are not geographic. The shared, first-class
+`Frame` + frame-locator is deferred to the library's `artifacts` step — see
+data-extraction-lib `docs/adr/0001-geo-stays-pure-frame-location-deferred.md`.
+"""
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from data_extraction_lib.geo import Area, Coordinate
+
 from src.core.storage import resolve_artifact_path
-from src.geo.area import Area, contains
 
 
 @dataclass(frozen=True)
@@ -24,7 +35,7 @@ def frames_in_area(area: Area, frames: list[dict]) -> list[int]:
         lat, lon = frame.get("lat"), frame.get("lon")
         if lat is None or lon is None:
             continue
-        if contains(area, float(lat), float(lon)):
+        if area.contains(Coordinate(float(lat), float(lon))):
             out.append(frame_id)
     return out
 

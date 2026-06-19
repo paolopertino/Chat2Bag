@@ -1,5 +1,7 @@
+from data_extraction_lib.geo import Circle, haversine
+
 from src.core.app_config import AppConfig, get_app_config
-from src.geo.area import Circle, area_from_payload, haversine
+from src.geo.area_payload import parse_area_payload
 from src.geo.locator import resolve_area_to_frames
 
 
@@ -14,7 +16,7 @@ class MapSearchService:
     def browse(self, area_payload: dict, bag_paths: list[str], top_k: int | None = None) -> list[dict]:
         if not bag_paths:
             raise ValueError("Must provide at least one bag path.")
-        area = area_from_payload(area_payload)
+        area = parse_area_payload(area_payload)
         if area is None:
             raise ValueError("An area is required for map browse.")
 
@@ -31,8 +33,9 @@ class MapSearchService:
                     "lat": lf.lat,
                     "lon": lf.lon,
                 }
-                if isinstance(area, Circle):
-                    row["distance_m"] = haversine(area.lat, area.lon, lf.lat, lf.lon)
+                if len(area.geometries) == 1 and isinstance(area.geometries[0], Circle):
+                    center = area.geometries[0].center
+                    row["distance_m"] = haversine(center.lat, center.lon, lf.lat, lf.lon)
                 rows.append(row)
 
         rows.sort(key=lambda r: (r["bag_path"], r["timestamp_ns"]))

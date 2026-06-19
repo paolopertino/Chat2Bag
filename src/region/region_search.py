@@ -13,7 +13,7 @@ from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_region_stamp_compatible, read_region_stamp
 from src.core.storage import resolve_artifact_path
 from src.embedding import FrameEmbedder, create_embedder
-from src.geo.area import area_from_payload
+from src.geo.area_payload import parse_area_payload
 from src.geo.locator import frames_in_area
 from src.region.faiss_index import FaissPatchIndex
 from src.region.query import build_query_from_points, build_query_from_text
@@ -94,7 +94,7 @@ class RegionSearcher:
     ) -> list[dict]:
         exclude_path = str(Path(exclude_file_path).expanduser().resolve()) if exclude_file_path else None
         top_k_patches = max(1, self._cfg.top_k_patches)
-        area_obj = area_from_payload(area)
+        area_obj = parse_area_payload(area)
         all_results: list[dict] = []
 
         for bag_path, artifact, frames in self._compatible_region_bags(bag_paths):
