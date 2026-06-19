@@ -97,15 +97,19 @@ The remodel is done *as each module moves* (final shape on arrival). The
 notable upgrades over today's function-on-dict style:
 
 **`geo/`**
-- `Coordinate` with lat, long attributes.
+- `Coordinate` with lat, lon attributes.
 - `Geometry` (ABC) with polymorphic `.contains(Coordinate) -> bool` and `.bbox() -> (min_lat, min_lon, max_lat, max_lon)`.
-  Subclasses `Circle(Coordinate, radius_m)` and `Polygon(vertices)`. Classmethod
-  `Geometry.from_payload(dict | None) -> Geometry | None` replaces the free
-  `area_from_payload`. `haversine` stays a pure module function.
-- `Area` is a composition of 1:n `Geometry`. Public `.contains()` method.
-- `Fix` — frozen value object `(timestamp_ns, Coordinate)`.
-- `LocatedFrame` — frozen value object; pure `frames_in_area(area, frames)` and
-  `located_frames_in_area(area, frames, artifact_dir)`.
+  Subclasses `Circle(center: Coordinate, radius_m)` and `Polygon(vertices)`. Classmethod
+  `Geometry.from_payload(dict) -> Geometry` parses one shape. `haversine` and the pure
+  batch filter `coordinates_in_area(area, coords) -> list[Coordinate]` are module
+  functions. Constants (`EARTH_RADIUS_M`, `METERS_PER_DEGREE`) live in `geo/constants.py`.
+- `Area` is a composition of 1:n `Geometry`. Public `.contains()` method. Static
+  `Area.from_payload(dict | None) -> Area | None` accepts only the **generic**
+  `{"geometries": [...]}` payload (wrapping a legacy single shape is the consumer's job).
+- **NOT in `geo`** (decision — see lib `docs/adr/0001-geo-stays-pure-frame-location-deferred.md`):
+  `LocatedFrame` and the frame-location functions. `topic`/`file_path`/`timestamp_ns` are
+  ROS2/artifact/bag concepts, not geographic; they stay app-side, and the *shared* `Frame`
+  + frame-locator is deferred to the `artifacts` step. `Fix` likewise moves with `ros2`/gps.
 
 **`artifacts/`**
 - `BagArtifacts(artifact_dir: Path)` — owns the layout: `.metadata_path`,
@@ -245,12 +249,17 @@ already-migrated, already-green packages.
 
 **Step 1 — `geo`** (this step gets its own implementation plan):
 - Move to the library, in final object shape: the `Area` hierarchy
-  (`Area`/`Circle`/`Polygon` with `.contains`/`.bbox`/`from_payload`),
-  `haversine`, `Fix`, `LocatedFrame`, and the pure `frames_in_area` /
-  `located_frames_in_area`.
-- Stays in the webapp (for now): `resolve_area_to_frames`, as thin I/O glue that
-  reads metadata and calls the library's pure functions — it absorbs into
-  `artifacts` at the next step.
+  (`Area`/`Circle`/`Polygon` with `.contains`/`.bbox`, generic `Area.from_payload`),
+  `haversine`, the pure `coordinates_in_area` filter, and `geo/constants.py`.
+  **Revised** (lib ADR-0001): `Fix`, `LocatedFrame`, and `frames_in_area` /
+  `located_frames_in_area` do **not** move to `geo` — they are ROS2/artifact/bag
+  shaped, not geographic.
+- Stays in the webapp (for now): the whole frame-location glue — `LocatedFrame`,
+  `frames_in_area`, `located_frames_in_area`, `resolve_area_to_frames` — refactored
+  onto the lib's `Area`/`Coordinate`; plus `parse_area_payload`, the app-side bridge
+  that wraps the legacy single-shape body into the generic payload (removed when the
+  frontend emits arrays — see docs/feature-requests/2026-06-19-frontend-multi-area-selection.md).
+  This glue absorbs into the shared `artifacts` `Frame`-locator at a later step.
 - This step also sets up the editable path dependency and proves the full
   cross-repo loop (install → import rewrite → tests move → green webapp suite →
   UI smoke of the map Area filter) at the lowest possible risk.

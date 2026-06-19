@@ -8,6 +8,17 @@
 
 **Tech Stack:** Python ≥3.10, uv (editable path dependency), pytest. `geo` is pure stdlib (`math`, `json`, `pathlib`, `dataclasses`) — it adds **no** third-party dependency to the library.
 
+> **Revision (2026-06-19, during execution):** A design grill changed two things from the
+> task bodies below. (1) `geo` stays **pure geometry** — `LocatedFrame` and the
+> frame-location functions do **not** move into the library; they stay app-side, and a
+> shared `Frame`-locator is deferred to the `artifacts` step (lib ADR-0001). The library
+> instead gains a pure `coordinates_in_area(area, coords) -> list[Coordinate]` filter and a
+> `geo/constants.py`. (2) `Area.from_payload` is **generic-only** (`{"geometries": [...]}`);
+> the webapp adds a `src/geo/area_payload.py::parse_area_payload` bridge that wraps the
+> legacy single-shape body, and the multi-area frontend is a separate feature
+> (`docs/feature-requests/2026-06-19-frontend-multi-area-selection.md`). Tasks 1–2 are as
+> written; Tasks 3–4 reflect this revision.
+
 ## Global Constraints
 
 - **Two separate git repos.** `data-extraction-lib` (`git@gitlab.com:niulinx/aida/aida-tools/data-extraction-lib.git`, default branch `main`) and `Chat2Bag` (`github.com/paolopertino/Chat2Bag`, work branch `refactor/extract-data-extraction-lib`). Commit lib changes in the lib repo, webapp changes in the Chat2Bag repo — never mix.
