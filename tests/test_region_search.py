@@ -114,13 +114,13 @@ def test_refine_recomputes_top_frame(tmp_path):
     searcher = RegionSearcher(config=cfg, embedder=FakeDenseEmbedder(dim=dim))
 
     calls = {"n": 0}
-    orig = searcher._embedder.embed_dense
+    orig = searcher._embedder.embed_dense_value
 
     def _spy(imgs):
         calls["n"] += 1
         return orig(imgs)
 
-    searcher._embedder.embed_dense = _spy
+    searcher._embedder.embed_dense_value = _spy
     results = searcher.search_by_q(_unit(dim, 0), [bag_path], top_k=5)
     assert calls["n"] >= 1  # refine recomputed the top frame from its thumbnail
     assert results[0]["timestamp_ns"] == 10

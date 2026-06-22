@@ -157,7 +157,7 @@ class RegionSearcher:
         for res in results:
             try:
                 with Image.open(res["file_path"]) as im:
-                    grid = self._embedder.embed_dense([im.convert("RGB")])[0]
+                    grid = self._embedder.embed_dense_value([im.convert("RGB")])[0][1]
             except (FileNotFoundError, OSError):
                 continue
             sims = grid.reshape(-1, grid.shape[-1]) @ q
@@ -177,7 +177,7 @@ class RegionSearcher:
         (H_p, W_p) cosine grid vs q. Independent of any index."""
         q = q.reshape(-1)
         with Image.open(target_file_path) as im:
-            grid = self._embedder.embed_dense([im.convert("RGB")])[0]  # (H_p, W_p, dim)
+            grid = self._embedder.embed_dense_value([im.convert("RGB")])[0][1]  # (H_p, W_p, dim)
         h_p, w_p, _ = grid.shape
         sims = (grid.reshape(-1, grid.shape[-1]) @ q).reshape(h_p, w_p)
         return {"height": int(h_p), "width": int(w_p), "grid": sims.astype(float).tolist()}

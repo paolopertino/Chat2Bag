@@ -18,7 +18,7 @@ def build_query_from_points(image: Image.Image, points: list[dict], embedder) ->
         if not (0.0 <= float(p["x"]) <= 1.0 and 0.0 <= float(p["y"]) <= 1.0):
             raise ValueError("Each point's x and y must be in [0, 1]")
 
-    grid = embedder.embed_dense([image.convert("RGB")])[0]  # (H_p, W_p, dim)
+    grid = embedder.embed_dense_value([image.convert("RGB")])[0][1]  # (H_p, W_p, dim)
     h_p, w_p, _ = grid.shape
     picked = []
     for p in points:

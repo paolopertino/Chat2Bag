@@ -97,7 +97,7 @@ class Indexer:
                         "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
                     )
                     continue
-                (cls, grid), = self.embedder.embed_global_and_dense([img])
+                (cls, grid), = self.embedder.embed_dense_value([img])
                 data_to_insert.append(
                     {
                         "timestamp_ns": meta["timestamp_ns"],

@@ -70,6 +70,7 @@ async def lifespan(fastapi_app: FastAPI):
     from data_extraction_lib.embedding import create_embedder
 
     from src.core.embedding_settings import embedding_settings_from_config
+    from src.core.normalizing_embedder import NormalizingEmbedder
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Using compute device: %s", device)
@@ -78,7 +79,9 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    embedder = create_embedder(embedding_settings_from_config(config), device=device)
+    embedder = NormalizingEmbedder(
+        create_embedder(embedding_settings_from_config(config), device=device)
+    )
     logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config
