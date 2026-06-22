@@ -14,7 +14,9 @@ from src.core.index_manifest import delete_index_manifest, write_index_manifest
 from src.core.index_stamp import write_embedder_stamp, write_region_stamp
 from src.core.schema_versions import METADATA_SCHEMA_VERSION
 from src.core.storage import resolve_artifact_path
-from src.embedding import FrameEmbedder, create_embedder
+from data_extraction_lib.embedding import FrameEmbedder, create_embedder
+
+from src.core.embedding_settings import embedding_settings_from_config
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,11 @@ class Indexer:
         self.batch_size = app_config.ingestion.batch_size
         # The embedder is normally injected (shared singleton). Fall back to building
         # one from config for standalone/CLI use.
-        self.embedder = embedder if embedder is not None else create_embedder(app_config)
+        self.embedder = (
+            embedder
+            if embedder is not None
+            else create_embedder(embedding_settings_from_config(app_config))
+        )
         self._region_indexer = region_indexer
 
     def build_index(self):

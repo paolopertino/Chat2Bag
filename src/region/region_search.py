@@ -12,7 +12,9 @@ from PIL import Image
 from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_region_stamp_compatible, read_region_stamp
 from src.core.storage import resolve_artifact_path
-from src.embedding import FrameEmbedder, create_embedder
+from data_extraction_lib.embedding import FrameEmbedder, create_embedder
+
+from src.core.embedding_settings import embedding_settings_from_config
 from src.geo.area_payload import parse_area_payload
 from src.geo.locator import frames_in_area
 from src.region.faiss_index import FaissPatchIndex
@@ -28,7 +30,11 @@ class RegionSearcher:
         self.temporal_dedup_window_ns = int(
             max(0.0, app_config.search.temporal_dedup_window_sec) * 1_000_000_000
         )
-        self._embedder = embedder if embedder is not None else create_embedder(app_config)
+        self._embedder = (
+            embedder
+            if embedder is not None
+            else create_embedder(embedding_settings_from_config(app_config))
+        )
         self._index_cache: dict[str, FaissPatchIndex] = {}
 
     def invalidate_cache(self, region_dir: str) -> None:

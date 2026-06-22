@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 
-from src.embedding import FrameEmbedder
+from data_extraction_lib.embedding import FrameEmbedder
 
 
 class FakeEmbedder(FrameEmbedder):

@@ -67,7 +67,9 @@ async def lifespan(fastapi_app: FastAPI):
         indexing_status[bag_path] = "error"
 
     # Resolve compute device once at startup and share across all components.
-    from src.embedding import create_embedder
+    from data_extraction_lib.embedding import create_embedder
+
+    from src.core.embedding_settings import embedding_settings_from_config
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Using compute device: %s", device)
@@ -76,7 +78,7 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    embedder = create_embedder(config, device=device)
+    embedder = create_embedder(embedding_settings_from_config(config), device=device)
     logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config

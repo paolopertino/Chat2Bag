@@ -11,7 +11,9 @@ from PIL import Image
 from src.core.app_config import AppConfig, get_app_config
 from src.core.index_stamp import is_stamp_compatible, read_embedder_stamp
 from src.core.storage import resolve_artifact_path
-from src.embedding import FrameEmbedder, create_embedder
+from data_extraction_lib.embedding import FrameEmbedder, create_embedder
+
+from src.core.embedding_settings import embedding_settings_from_config
 from src.geo.area_payload import parse_area_payload
 from src.geo.locator import resolve_area_to_frames
 
@@ -29,7 +31,11 @@ class GlobalSearcher:
         self.temporal_dedup_window_ns = int(
             max(0.0, app_config.search.temporal_dedup_window_sec) * 1_000_000_000
         )
-        self._embedder = embedder if embedder is not None else create_embedder(app_config)
+        self._embedder = (
+            embedder
+            if embedder is not None
+            else create_embedder(embedding_settings_from_config(app_config))
+        )
         self._db_cache: dict[str, lancedb.DBConnection] = {}
 
     def _get_db(self, db_path: str) -> lancedb.DBConnection:

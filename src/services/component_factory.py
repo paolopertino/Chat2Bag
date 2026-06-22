@@ -1,8 +1,9 @@
 from pathlib import Path
 
+from data_extraction_lib.embedding import FrameEmbedder
+
 from src.core.app_config import AppConfig
 from src.core.storage import resolve_artifact_path
-from src.embedding import FrameEmbedder
 from src.ingestion.bag_parser import BagParser
 from src.ingestion.indexer import Indexer
 from src.region.dense_indexer import DensePatchIndexer
