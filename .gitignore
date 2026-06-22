@@ -27,3 +27,6 @@ indexing_errors.json
 
 # Claude Code local settings (keep commands/ tracked)
 .claude/settings.local.json
+
+# Serena coding-agent workspace
+.serena/
