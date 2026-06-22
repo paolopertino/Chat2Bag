@@ -46,10 +46,10 @@ class NormalizingEmbedder(FrameEmbedder):
     def embed_text(self, queries: list[str]) -> np.ndarray:
         return _l2(self._inner.embed_text(queries))
 
-    def embed_dense(self, images):
+    def embed_dense(self, images: list[Image.Image]) -> list[tuple[np.ndarray, np.ndarray]]:
         return [(_l2(cls), _l2(grid)) for cls, grid in self._inner.embed_dense(images)]
 
-    def embed_dense_value(self, images):
+    def embed_dense_value(self, images: list[Image.Image]) -> list[tuple[np.ndarray, np.ndarray]]:
         return [(_l2(cls), _l2(grid)) for cls, grid in self._inner.embed_dense_value(images)]
 
     def to(self, device: str) -> "NormalizingEmbedder":
