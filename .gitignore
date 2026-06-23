@@ -30,3 +30,6 @@ indexing_errors.json
 
 # Serena coding-agent workspace
 .serena/
+
+# Generic Agentic coding files
+docs
