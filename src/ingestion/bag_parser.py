@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 import re
 
@@ -13,10 +12,9 @@ from rosbags.typesys import get_typestore, Stores
 from rosbags.image import message_to_cvimage
 
 from src.core.app_config import AppConfig, get_app_config
-from src.core.index_stamp import build_gps_stamp
-from src.core.schema_versions import METADATA_SCHEMA_VERSION
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.ingestion.gps import fix_from_navsatfix, locate_frames
+from data_extraction_lib.artifacts import GpsStamp, Metadata
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +89,9 @@ class BagParser:
         self.gps_max_gap_ns = int(app_config.ingestion.gps_max_gap_sec * 1e9)
 
         # Set up the artifact directories
-        self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
-
-        self.thumbnail_dir = self.artifact_dir / "thumbnails"
+        self._artifacts = artifacts_for_bag(self.bag_path)
+        self.artifact_dir = self._artifacts.dir
+        self.thumbnail_dir = self._artifacts.thumbnails_dir
         self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
         self.typestore = get_typestore(Stores.LATEST)
@@ -102,14 +100,8 @@ class BagParser:
         """Reads the bag and extracts aspect-preserving frames per camera topic."""
         logger.info("Opening bag: %s", self.bag_path.name)
 
-        metadata = {
-            "schema_version": METADATA_SCHEMA_VERSION,
-            "bag_name": self.bag_path.name,
-            "cameras": [],
-            "embedder": None,
-            "gps": None,
-            "frames": [],
-        }
+        cameras: list[str] = []
+        frames: list[dict] = []
 
         # Sampling interval, tracked independently per camera topic.
         interval_ns = int((1.0 / self.fps) * 1e9)
@@ -124,7 +116,7 @@ class BagParser:
                     f"None of the configured camera topics {list(self.topics)} "
                     f"found in {self.bag_path.name}"
                 )
-            metadata["cameras"] = present_topics
+            cameras = present_topics
 
             gps_connections = (
                 [c for c in reader.connections if c.topic == self.gps_topic]
@@ -169,7 +161,7 @@ class BagParser:
                     if not cv2.imwrite(str(frame_path), cv_img_resized):
                         raise ValueError(f"Failed to write frame to {frame_path}")
 
-                    metadata["frames"].append(
+                    frames.append(
                         {
                             "timestamp_ns": timestamp_ns,
                             "topic": topic,
@@ -188,29 +180,28 @@ class BagParser:
                     )
                     continue
 
+        gps_stamp = None
         if self.gps_topic and gps_connections:
-            located = locate_frames(metadata["frames"], fixes, self.gps_max_gap_ns)
-            metadata["gps"] = build_gps_stamp(
+            located = locate_frames(frames, fixes, self.gps_max_gap_ns)
+            gps_stamp = GpsStamp(
                 topic=self.gps_topic,
                 max_gap_sec=self.gps_max_gap_ns / 1e9,
                 fix_count=len(fixes),
                 located_frame_count=located,
-                frame_count=len(metadata["frames"]),
+                frame_count=len(frames),
             )
-            logger.info("GPS: %d fixes, %d/%d frames located", len(fixes), located, len(metadata["frames"]))
+            logger.info("GPS: %d fixes, %d/%d frames located", len(fixes), located, len(frames))
 
-        # Write the metadata mapping file
-        metadata_path = self.artifact_dir / "metadata.json"
-        with metadata_path.open("w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=4)
+        meta = Metadata(bag_name=self.bag_path.name, cameras=cameras, frames=frames, gps=gps_stamp)
+        meta.save(self._artifacts)
 
         logger.info(
             "Extraction complete! Saved %s frames across %d cameras to %s",
             saved_count,
-            len(metadata["cameras"]),
+            len(cameras),
             self.thumbnail_dir,
         )
-        return metadata_path
+        return self._artifacts.metadata_path
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 
 from pathlib import Path
@@ -10,10 +9,14 @@ from PIL import Image
 from tqdm import tqdm
 
 from src.core.app_config import AppConfig, get_app_config
-from src.core.index_manifest import delete_index_manifest, write_index_manifest
-from src.core.index_stamp import write_embedder_stamp, write_region_stamp
-from src.core.schema_versions import METADATA_SCHEMA_VERSION
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
+from data_extraction_lib.artifacts import (
+    EmbedderStamp,
+    IndexManifest,
+    Metadata,
+    PqParams,
+    RegionStamp,
+)
 from data_extraction_lib.embedding import FrameEmbedder, create_embedder
 
 from src.core.embedding_settings import embedding_settings_from_config
@@ -32,9 +35,10 @@ class Indexer:
         self.bag_path = Path(bag_path)
         app_config = config or get_app_config()
 
-        self.artifact_dir = resolve_artifact_path(bag_path=self.bag_path)
-        self.metadata_path = self.artifact_dir / "metadata.json"
-        self.db_path = self.artifact_dir / "lancedb"
+        self._artifacts = artifacts_for_bag(self.bag_path)
+        self.artifact_dir = self._artifacts.dir
+        self.metadata_path = self._artifacts.metadata_path
+        self.db_path = self._artifacts.lancedb_dir
 
         if not self.metadata_path.exists():
             raise FileNotFoundError(
@@ -55,21 +59,19 @@ class Indexer:
         """Embeds frames via the active embedder, writes LanceDB, and stamps metadata."""
         # Clear any stale completion marker up-front so a failed/partial run can
         # never read as indexed; it is rewritten only on the success path below.
-        delete_index_manifest(self.artifact_dir)
+        IndexManifest.delete(self._artifacts)
 
         logger.info("Loading metadata from %s...", self.metadata_path)
-        with self.metadata_path.open("r", encoding="utf-8") as f:
-            metadata = json.load(f)
+        meta = Metadata.load(self._artifacts)
 
-        schema_version = metadata.get("schema_version", 1)
-        if schema_version < METADATA_SCHEMA_VERSION:
+        if meta.schema_version < Metadata.SCHEMA_VERSION:
             logger.warning(
                 "Metadata schema v%d is older than current v%d; re-extract + re-index required.",
-                schema_version,
-                METADATA_SCHEMA_VERSION,
+                meta.schema_version,
+                Metadata.SCHEMA_VERSION,
             )
 
-        frames = metadata.get("frames", [])
+        frames = meta.frames
         if not frames:
             logger.warning("No frames found to index.")
             return
@@ -87,8 +89,8 @@ class Indexer:
         if region_active:
             # Fused fresh-index loop: one trunk pass per frame → CLS to LanceDB,
             # value-attention grid to the region indexer.
-            for frame_id, meta in enumerate(tqdm(frames)):
-                abs_path = str(self.artifact_dir / meta["file_path"])
+            for frame_id, frame in enumerate(tqdm(frames)):
+                abs_path = str(self.artifact_dir / frame["file_path"])
                 try:
                     with Image.open(abs_path) as image:
                         img = image.convert("RGB")
@@ -100,9 +102,9 @@ class Indexer:
                 (cls, grid), = self.embedder.embed_dense_value([img])
                 data_to_insert.append(
                     {
-                        "timestamp_ns": meta["timestamp_ns"],
+                        "timestamp_ns": frame["timestamp_ns"],
                         "file_path": abs_path,
-                        "topic": meta["topic"],
+                        "topic": frame["topic"],
                         "vector": cls.tolist(),
                     }
                 )
@@ -112,12 +114,12 @@ class Indexer:
                 batch_meta = frames[i : i + self.batch_size]
                 valid_batch_meta = []
                 images = []
-                for meta in batch_meta:
-                    abs_path = str(self.artifact_dir / meta["file_path"])
+                for frame in batch_meta:
+                    abs_path = str(self.artifact_dir / frame["file_path"])
                     try:
                         with Image.open(abs_path) as image:
                             images.append(image.convert("RGB"))
-                        valid_batch_meta.append({**meta, "_abs_path": abs_path})
+                        valid_batch_meta.append({**frame, "_abs_path": abs_path})
                     except (FileNotFoundError, OSError):
                         logger.warning(
                             "Skipping unreadable frame %s during indexing", abs_path, exc_info=True
@@ -128,12 +130,12 @@ class Indexer:
 
                 embeddings = self.embedder.embed_images(images)
 
-                for meta, emb in zip(valid_batch_meta, embeddings):
+                for frame, emb in zip(valid_batch_meta, embeddings):
                     data_to_insert.append(
                         {
-                            "timestamp_ns": meta["timestamp_ns"],
-                            "file_path": meta["_abs_path"],
-                            "topic": meta["topic"],
+                            "timestamp_ns": frame["timestamp_ns"],
+                            "file_path": frame["_abs_path"],
+                            "topic": frame["topic"],
                             "vector": emb.tolist(),
                         }
                     )
@@ -148,21 +150,21 @@ class Indexer:
         db.create_table(table_name, data=data_to_insert, mode="overwrite")
 
         # Stamp the index with the embedder identity so the searcher can detect mismatches.
-        write_embedder_stamp(
-            self.metadata_path, name=self.embedder.name, dim=self.embedder.embedding_dim
-        )
+        meta.embedder = EmbedderStamp(name=self.embedder.name, dim=self.embedder.embedding_dim)
+        meta.save(self._artifacts)
 
         if region_active:
             patch_count = self._region_indexer.finalize()
-            write_region_stamp(
-                self.metadata_path,
-                name=self.embedder.name,
+            pq = self._region_indexer.pq_params
+            meta.region_index = RegionStamp(
+                embedder_name=self.embedder.name,
                 dim=self.embedder.embedding_dim,
                 feature="value-attention",
                 encode_long_side=int(self.embedder.encode_long_side),
-                pq=self._region_indexer.pq_params,
+                pq=PqParams(m=int(pq["m"]), nbits=int(pq["nbits"])),
                 patch_count=patch_count,
             )
+            meta.save(self._artifacts)
 
         logger.info(
             "Index built! %d records, stamped %s (dim=%d).",
@@ -173,14 +175,12 @@ class Indexer:
 
         # Final step of a successful run: the dedicated completion marker.
         cameras = sorted({frame["topic"] for frame in frames if "topic" in frame})
-        write_index_manifest(
-            self.artifact_dir,
-            embedder_name=self.embedder.name,
-            embedder_dim=self.embedder.embedding_dim,
+        IndexManifest(
+            embedder=EmbedderStamp(name=self.embedder.name, dim=self.embedder.embedding_dim),
             frame_count=len(data_to_insert),
             cameras=cameras,
             region_index=region_active,
-        )
+        ).write(self._artifacts)
 
 
 if __name__ == "__main__":

@@ -4,12 +4,7 @@ import lancedb
 from PIL import Image
 
 from src.core.app_config import get_app_config
-from src.core.index_manifest import (
-    is_indexed,
-    read_index_manifest,
-    write_index_manifest,
-)
-from src.core.index_stamp import read_region_stamp
+from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest, Metadata
 from src.ingestion.indexer import Indexer
 from src.region.dense_indexer import DensePatchIndexer
 from tests.fakes import FakeDenseEmbedder, FakeEmbedder
@@ -73,12 +68,13 @@ def test_fused_index_builds_region_index_and_stamps(tmp_path):
     indexer.build_index()
 
     assert (artifact / "region" / "patches.faiss").exists()
-    stamp = read_region_stamp(artifact / "metadata.json")
+    meta = Metadata.load(BagArtifacts(artifact))
+    stamp = meta.region_index
     assert stamp is not None
-    assert stamp["embedder_name"] == "fake-dense:test"
-    assert stamp["feature"] == "value-attention"
-    assert stamp["encode_long_side"] == 56
-    assert stamp["patch_count"] == 6  # 1 frame × 6 patches
+    assert stamp.embedder_name == "fake-dense:test"
+    assert stamp.feature == "value-attention"
+    assert stamp.encode_long_side == 56
+    assert stamp.patch_count == 6  # 1 frame × 6 patches
 
 
 def test_fused_cls_rows_match_standalone(tmp_path):
@@ -100,12 +96,12 @@ def test_fused_cls_rows_match_standalone(tmp_path):
 def test_build_index_writes_manifest_on_success(tmp_path):
     cfg, bag, artifact = _make_bag(tmp_path)
     Indexer(str(bag), config=cfg, embedder=FakeEmbedder(dim=4, name="fake:test")).build_index()
-    data = read_index_manifest(artifact)
+    data = IndexManifest.read(BagArtifacts(artifact))
     assert data is not None
-    assert data["embedder"] == {"name": "fake:test", "dim": 4}
-    assert data["frame_count"] == 1
-    assert data["cameras"] == ["/cam/a"]
-    assert data["region_index"] is False
+    assert data.embedder == EmbedderStamp("fake:test", 4)
+    assert data.frame_count == 1
+    assert data.cameras == ["/cam/a"]
+    assert data.region_index is False
 
 
 def test_build_index_manifest_marks_region(tmp_path):
@@ -116,7 +112,7 @@ def test_build_index_manifest_marks_region(tmp_path):
     Indexer(
         str(bag), config=cfg, embedder=FakeDenseEmbedder(dim=4), region_indexer=region_indexer
     ).build_index()
-    assert read_index_manifest(artifact)["region_index"] is True
+    assert IndexManifest.read(BagArtifacts(artifact)).region_index is True
 
 
 def test_build_index_no_manifest_when_no_frames(tmp_path):
@@ -125,18 +121,17 @@ def test_build_index_no_manifest_when_no_frames(tmp_path):
     meta["frames"] = []  # forces the "No frames found" early return
     (artifact / "metadata.json").write_text(json.dumps(meta))
     Indexer(str(bag), config=cfg, embedder=FakeEmbedder(dim=4)).build_index()
-    assert is_indexed(artifact) is False
+    assert IndexManifest.is_indexed(BagArtifacts(artifact)) is False
 
 
 def test_build_index_delete_at_start_clears_stale_manifest(tmp_path):
     cfg, bag, artifact = _make_bag(tmp_path)
-    write_index_manifest(
-        artifact, embedder_name="stale", embedder_dim=4,
-        frame_count=99, cameras=["/old"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp("stale", 4), frame_count=99, cameras=["/old"], region_index=False,
+    ).write(BagArtifacts(artifact))
     # No frames -> early return without rewriting; delete-at-start must still clear it.
     meta = json.loads((artifact / "metadata.json").read_text())
     meta["frames"] = []
     (artifact / "metadata.json").write_text(json.dumps(meta))
     Indexer(str(bag), config=cfg, embedder=FakeEmbedder(dim=4)).build_index()
-    assert is_indexed(artifact) is False
+    assert IndexManifest.is_indexed(BagArtifacts(artifact)) is False
