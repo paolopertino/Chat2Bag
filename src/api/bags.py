@@ -83,7 +83,7 @@ def _find_indexed_dirs_in_storage(storage_root: Path) -> List[Path]:
     """Shallow one-level walk of a configured storage_path: each child folder
     whose synthetic bag path resolves to a completed index is an index-only bag.
 
-    In storage_path mode resolve_artifact_path keys off the folder name, so the
+    In storage_path mode artifacts_for_bag keys off the folder name, so the
     child path <storage_root>/<name> round-trips to its own artifact dir.
     """
     found: List[Path] = []
