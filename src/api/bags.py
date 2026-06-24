@@ -1,5 +1,4 @@
 import asyncio
-import json
 import math
 
 from pathlib import Path
@@ -10,10 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.state import indexing_errors, indexing_status
 from src.auth.dependencies import require_current_user
 from src.core.app_config import get_app_config
-from src.core.index_manifest import ensure_manifest, is_indexed as bag_is_indexed
-from src.core.index_stamp import gps_is_located, read_gps_stamp
+from data_extraction_lib.artifacts import IndexManifest, Metadata
 from src.core.settings import get_settings
-from src.core.storage import metadata_path_for_bag, resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.services.sample_service import FocusFrameNotFound, build_samples_response
 
 router = APIRouter(
@@ -25,13 +23,6 @@ router = APIRouter(
 _SETTINGS = get_settings()
 
 _ARTIFACT_DIR_NAME = _SETTINGS["storage"]["artifact_dir"]
-
-
-def _artifact_dir_for_bag(path: Path) -> Path:
-    return resolve_artifact_path(bag_path=path)
-
-
-_metadata_path_for_bag = metadata_path_for_bag
 
 
 def _has_raw_bag(path: Path) -> bool:
@@ -47,11 +38,11 @@ def _has_raw_bag(path: Path) -> bool:
 def _is_indexed_bag(path: Path) -> bool:
     """A folder whose resolved artifact dir carries a valid completion manifest.
 
-    Heals legacy stamp-only indexes into a manifest on the spot (see
-    index_manifest.ensure_manifest) so index-only bags become discoverable.
+    Heals legacy stamp-only indexes into a manifest on the spot so index-only bags
+    become discoverable.
     """
     try:
-        return ensure_manifest(resolve_artifact_path(bag_path=path))
+        return IndexManifest.ensure(artifacts_for_bag(path))
     except (PermissionError, OSError):
         return False
 
@@ -116,7 +107,7 @@ def _dedup_by_artifact_dir(candidates: List[Path]) -> List[Path]:
     by_artifact: Dict[Path, Path] = {}
     for path in candidates:
         try:
-            key = resolve_artifact_path(bag_path=path).resolve()
+            key = artifacts_for_bag(path).dir.resolve()
         except (PermissionError, OSError):
             continue
         existing = by_artifact.get(key)
@@ -161,20 +152,21 @@ async def scan_bags(
 
     bags: List[Dict[str, Any]] = []
     for candidate in sorted(bag_dirs, key=lambda p: str(p.resolve())):
-        artifact_dir = _artifact_dir_for_bag(candidate)
+        artifacts = artifacts_for_bag(candidate)
         # Lazy heal legacy indexes (raw or index-only) into a manifest.
-        ensure_manifest(artifact_dir)
+        IndexManifest.ensure(artifacts)
         bag_path = str(candidate.resolve())
-        stamp = read_gps_stamp(_metadata_path_for_bag(candidate))
+        meta = Metadata.try_load(artifacts)
+        gps = meta.gps if meta is not None else None
         bags.append(
             {
                 "bag_path": bag_path,
                 "bag_name": candidate.name,
-                "is_indexed": bag_is_indexed(artifact_dir),
+                "is_indexed": IndexManifest.is_indexed(artifacts),
                 "has_raw_data": _has_raw_bag(candidate),
                 "status": indexing_status.get(bag_path, "idle"),
-                "is_located": gps_is_located(stamp),
-                "located_frame_count": int(stamp.get("located_frame_count", 0)) if stamp else 0,
+                "is_located": gps.is_located if gps is not None else False,
+                "located_frame_count": gps.located_frame_count if gps is not None else 0,
                 "error_message": indexing_errors.get(bag_path),
             }
         )
@@ -194,7 +186,7 @@ async def bag_status(
     status = indexing_status.get(resolved_path)
 
     if status is None:
-        status = "done" if bag_is_indexed(_artifact_dir_for_bag(path)) else "idle"
+        status = "done" if IndexManifest.is_indexed(artifacts_for_bag(path)) else "idle"
 
     return {
         "bag_path": resolved_path,
@@ -212,29 +204,23 @@ async def bag_info(
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
-    metadata_path = _metadata_path_for_bag(path)
-    if not metadata_path.exists() or not metadata_path.is_file():
+    meta = Metadata.try_load(artifacts_for_bag(path))
+    if meta is None:
         raise HTTPException(
             status_code=404, detail="Bag metadata not found. Index the bag first."
         )
 
-    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
-        metadata = json.load(metadata_handle)
-
     timestamps = [
-        frame["timestamp_ns"]
-        for frame in metadata.get("frames", [])
-        if "timestamp_ns" in frame
+        frame["timestamp_ns"] for frame in meta.frames if "timestamp_ns" in frame
     ]
-
-    gps_stamp = metadata.get("gps")
+    gps = meta.gps
     return {
         "bag_path": str(path),
         "frame_count": len(timestamps),
         "first_timestamp_ns": min(timestamps) if timestamps else None,
         "last_timestamp_ns": max(timestamps) if timestamps else None,
-        "is_located": gps_is_located(gps_stamp),
-        "located_frame_count": int(gps_stamp.get("located_frame_count", 0)) if gps_stamp else 0,
+        "is_located": gps.is_located if gps is not None else False,
+        "located_frame_count": gps.located_frame_count if gps is not None else 0,
     }
 
 
@@ -248,16 +234,13 @@ async def bag_track(
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
-    metadata_path = _metadata_path_for_bag(path)
-    if not metadata_path.exists() or not metadata_path.is_file():
+    meta = Metadata.try_load(artifacts_for_bag(path))
+    if meta is None:
         raise HTTPException(status_code=404, detail="Bag metadata not found. Index the bag first.")
-
-    with metadata_path.open("r", encoding="utf-8") as handle:
-        metadata = json.load(handle)
 
     located = [
         {"lat": f["lat"], "lon": f["lon"], "timestamp_ns": f["timestamp_ns"]}
-        for f in metadata.get("frames", [])
+        for f in meta.frames
         if "lat" in f and "lon" in f
     ]
     located.sort(key=lambda p: p["timestamp_ns"])
@@ -277,14 +260,12 @@ async def bag_tracks(
     tracks = []
     for raw in bag_paths:
         path = Path(raw).expanduser().resolve()
-        metadata_path = _metadata_path_for_bag(path)
-        if not metadata_path.exists() or not metadata_path.is_file():
+        meta = Metadata.try_load(artifacts_for_bag(path))
+        if meta is None:
             continue
-        with metadata_path.open("r", encoding="utf-8") as handle:
-            metadata = json.load(handle)
         located = [
             {"lat": f["lat"], "lon": f["lon"], "timestamp_ns": f["timestamp_ns"]}
-            for f in metadata.get("frames", [])
+            for f in meta.frames
             if "lat" in f and "lon" in f
         ]
         if not located:
@@ -309,24 +290,21 @@ async def bag_frames(
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
-    artifact_dir = _artifact_dir_for_bag(path)
-    metadata_path = artifact_dir / "metadata.json"
-    if not metadata_path.exists() or not metadata_path.is_file():
+    artifacts = artifacts_for_bag(path)
+    meta = Metadata.try_load(artifacts)
+    if meta is None:
         raise HTTPException(
             status_code=404, detail="Bag metadata not found. Index the bag first."
         )
-
-    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
-        metadata = json.load(metadata_handle)
 
     duration_ns = int(duration_sec * 1e9)
     end_ns = start_ns + duration_ns
     frames = [
         {
             "timestamp_ns": frame["timestamp_ns"],
-            "file_path": str(artifact_dir / frame["file_path"]),
+            "file_path": str(artifacts.dir / frame["file_path"]),
         }
-        for frame in metadata.get("frames", [])
+        for frame in meta.frames
         if start_ns <= frame.get("timestamp_ns", -1) <= end_ns
     ]
     frames.sort(key=lambda frame: frame["timestamp_ns"])
@@ -350,21 +328,18 @@ async def bag_samples(
     if not path.exists() or not path.is_dir():
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
-    artifact_dir = _artifact_dir_for_bag(path)
-    metadata_path = artifact_dir / "metadata.json"
-    if not metadata_path.exists() or not metadata_path.is_file():
+    artifacts = artifacts_for_bag(path)
+    meta = Metadata.try_load(artifacts)
+    if meta is None:
         raise HTTPException(
             status_code=404, detail="Bag metadata not found. Index the bag first."
         )
 
-    with metadata_path.open("r", encoding="utf-8") as metadata_handle:
-        metadata = json.load(metadata_handle)
-
     try:
         return build_samples_response(
             bag_path=path,
-            artifact_dir=artifact_dir,
-            metadata=metadata,
+            artifact_dir=artifacts.dir,
+            metadata=meta,
             start_ns=start_ns,
             duration_sec=duration_sec,
             sampling_fps=get_app_config().ingestion.sampling_fps,

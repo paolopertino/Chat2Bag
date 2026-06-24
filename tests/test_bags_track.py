@@ -5,12 +5,12 @@ from fastapi.testclient import TestClient
 
 from src.api.bags import router as bags_router
 from src.core.app_config import get_app_config
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 
 
 def _bag(tmp_path):
     bag = tmp_path / "bag"
-    artifact = resolve_artifact_path(bag_path=bag)
+    artifact = artifacts_for_bag(bag).dir
     (artifact / "lancedb").mkdir(parents=True)
     frames = [
         {"timestamp_ns": 1, "topic": "/c", "file_path": "f1.jpg", "lat": 45.0, "lon": 10.0},

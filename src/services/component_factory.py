@@ -3,7 +3,7 @@ from pathlib import Path
 from data_extraction_lib.embedding import FrameEmbedder
 
 from src.core.app_config import AppConfig
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.ingestion.bag_parser import BagParser
 from src.ingestion.indexer import Indexer
 from src.region.dense_indexer import DensePatchIndexer
@@ -24,7 +24,7 @@ class BackendComponentFactory:
         region_indexer = None
         rc = self._config.region_search
         if rc.enabled and "dense" in self._embedder.capabilities:
-            region_dir = resolve_artifact_path(bag_path=Path(bag_path)) / "region"
+            region_dir = artifacts_for_bag(Path(bag_path)).region_dir
             region_indexer = DensePatchIndexer(
                 region_dir=region_dir,
                 dim=self._embedder.embedding_dim,

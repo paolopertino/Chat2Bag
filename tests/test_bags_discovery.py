@@ -1,7 +1,7 @@
 import json
 
 from src.api import bags as bags_mod
-from src.core.index_manifest import write_index_manifest
+from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest
 
 
 def _raw_bag(root, name):
@@ -15,10 +15,9 @@ def _indexed_only_bag(root, name, *, region=False):
     bag = root / name
     artifact = bag / ".bag_chat"
     artifact.mkdir(parents=True)
-    write_index_manifest(
-        artifact, embedder_name="x", embedder_dim=4,
-        frame_count=3, cameras=["/c"], region_index=region,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=3, cameras=["/c"], region_index=region,
+    ).write(BagArtifacts(artifact))
     return bag
 
 
@@ -99,10 +98,9 @@ def test_storage_mode_index_only_bag_discovered(tmp_path, storage_mode):
     storage_root = tmp_path / "store"
     art = storage_root / "movedbag" / ".bag_chat"
     art.mkdir(parents=True)
-    write_index_manifest(
-        art, embedder_name="x", embedder_dim=4,
-        frame_count=3, cameras=["/c"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=3, cameras=["/c"], region_index=False,
+    ).write(BagArtifacts(art))
     storage_mode(storage_root)
 
     root = tmp_path / "raws"
@@ -119,10 +117,9 @@ def test_storage_mode_dedups_preferring_raw(tmp_path, storage_mode):
     (raw / "rec.mcap").write_bytes(b"")
     art = storage_root / "mybag" / ".bag_chat"
     art.mkdir(parents=True)
-    write_index_manifest(
-        art, embedder_name="x", embedder_dim=4,
-        frame_count=3, cameras=["/c"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=3, cameras=["/c"], region_index=False,
+    ).write(BagArtifacts(art))
     storage_mode(storage_root)
 
     found = bags_mod._discover_bag_dirs(root)

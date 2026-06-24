@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks
 
-from src.core.index_manifest import delete_index_manifest
-from src.core.storage import resolve_artifact_path
+from data_extraction_lib.artifacts import IndexManifest
+from src.core.storage import artifacts_for_bag
 from src.retriever.global_search import GlobalSearcher
 from src.services.component_factory import BackendComponentFactory
 
@@ -48,7 +48,7 @@ class IndexingService:
         self._error_store.pop(resolved_bag_path, None)
         # Clear any stale completion marker before extraction so a failure here
         # (before build_index runs) cannot leave the bag reading as indexed.
-        delete_index_manifest(resolve_artifact_path(Path(resolved_bag_path)))
+        IndexManifest.delete(artifacts_for_bag(Path(resolved_bag_path)))
         try:
             parser = self._factory.create_bag_parser(resolved_bag_path)
             parser.extract_frames()
