@@ -2,7 +2,7 @@ import json
 
 from data_extraction_lib.geo import Area, Circle, Coordinate
 
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.geo.area_payload import parse_area_payload
 from src.geo.locator import LocatedFrame, frames_in_area, resolve_area_to_frames
 
@@ -43,7 +43,7 @@ def test_frames_in_area_keeps_only_located_inside():
 
 def test_resolve_area_to_frames_per_bag_and_frame_id(tmp_path):
     bag = tmp_path / "bag1"
-    artifact = resolve_artifact_path(bag_path=bag)
+    artifact = artifacts_for_bag(bag).dir
     artifact.mkdir(parents=True)
     meta = {"schema_version": 5, "frames": [
         _frame(10, "/c", "thumbnails/c/f10.jpg", 45.0, 10.0),  # frame_id 0, inside

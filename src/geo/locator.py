@@ -9,13 +9,13 @@ storage) and `timestamp_ns` (bag) are not geographic. The shared, first-class
 `Frame` + frame-locator is deferred to the library's `artifacts` step — see
 data-extraction-lib `docs/adr/0001-geo-stays-pure-frame-location-deferred.md`.
 """
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from data_extraction_lib.geo import Area, Coordinate
+from data_extraction_lib.artifacts import Metadata
 
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 
 
 @dataclass(frozen=True)
@@ -66,13 +66,9 @@ def located_frames_in_area(
 
 
 def _artifact_and_frames(bag_path: str) -> tuple[Path, list[dict]]:
-    artifact = resolve_artifact_path(bag_path=Path(bag_path))
-    meta_path = artifact / "metadata.json"
-    try:
-        with meta_path.open("r", encoding="utf-8") as handle:
-            return artifact, json.load(handle).get("frames", [])
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
-        return artifact, []
+    artifacts = artifacts_for_bag(Path(bag_path))
+    meta = Metadata.try_load(artifacts)
+    return artifacts.dir, (meta.frames if meta is not None else [])
 
 
 def resolve_area_to_frames(area: Area, bag_paths: list[str]) -> dict[str, list[LocatedFrame]]:

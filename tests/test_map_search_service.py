@@ -3,13 +3,13 @@ import json
 from pathlib import Path
 
 from src.core.app_config import get_app_config
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.services.map_search_service import MapSearchService
 
 
 def _write_bag(tmp_path, name, frames):
     bag = tmp_path / name
-    artifact = resolve_artifact_path(bag_path=bag)
+    artifact = artifacts_for_bag(bag).dir
     artifact.mkdir(parents=True)
     (artifact / "metadata.json").write_text(json.dumps({"schema_version": 5, "frames": frames}))
     return str(bag)
@@ -34,7 +34,7 @@ def test_browse_returns_in_area_chronological_no_score(tmp_path):
     assert "similarity_score" not in rows[0]
     assert rows[0]["lat"] == 45.0 and "distance_m" in rows[0]
     # file_path is ABSOLUTE so the browse tile preview is fetchable via /api/image.
-    assert rows[0]["file_path"] == str(resolve_artifact_path(bag_path=Path(bag)) / "f1.jpg")
+    assert rows[0]["file_path"] == str(artifacts_for_bag(Path(bag)).dir / "f1.jpg")
 
 
 def test_browse_keeps_separate_passes_and_all_cameras(tmp_path):

@@ -1,22 +1,21 @@
 """Attach Frame locations (lat/lon) to search hits by joining bag metadata."""
 
-import json
 from pathlib import Path
 from typing import Any
 
-from src.core.storage import metadata_path_for_bag
+from data_extraction_lib.artifacts import Metadata
+
+from src.core.storage import artifacts_for_bag
 
 LocationIndex = dict[tuple[str, int], tuple[float, float]]
 
 
 def _location_index(bag_path: str) -> LocationIndex:
     index: LocationIndex = {}
-    metadata_path = metadata_path_for_bag(Path(bag_path))
-    if not metadata_path.exists() or not metadata_path.is_file():
+    meta = Metadata.try_load(artifacts_for_bag(Path(bag_path)))
+    if meta is None:
         return index
-    with metadata_path.open("r", encoding="utf-8") as handle:
-        metadata = json.load(handle)
-    for frame in metadata.get("frames", []):
+    for frame in meta.frames:
         if "lat" in frame and "lon" in frame:
             index[(frame["topic"], int(frame["timestamp_ns"]))] = (frame["lat"], frame["lon"])
     return index
