@@ -9,8 +9,8 @@ import lancedb
 from PIL import Image
 
 from src.core.app_config import AppConfig, get_app_config
-from src.core.index_stamp import is_stamp_compatible, read_embedder_stamp
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
+from data_extraction_lib.artifacts import Metadata
 from data_extraction_lib.embedding import FrameEmbedder, create_embedder
 
 from src.core.embedding_settings import embedding_settings_from_config
@@ -55,15 +55,16 @@ class GlobalSearcher:
         """Keep only bags whose index stamp matches the active embedder."""
         keep: list[str] = []
         for bag_path in bag_paths:
-            meta_path = resolve_artifact_path(bag_path=Path(bag_path)) / "metadata.json"
-            stamp = read_embedder_stamp(meta_path)
-            if is_stamp_compatible(stamp, self._embedder.name, self._embedder.embedding_dim):
+            meta = Metadata.try_load(artifacts_for_bag(Path(bag_path)))
+            if meta is not None and meta.embedder_compatible_with(
+                self._embedder.name, self._embedder.embedding_dim
+            ):
                 keep.append(bag_path)
             else:
                 logger.warning(
                     "Skipping %s: indexed with %s, active embedder is %s (dim=%d) — re-index to include it.",
                     Path(bag_path).name,
-                    stamp,
+                    meta.embedder if meta is not None else None,
                     self._embedder.name,
                     self._embedder.embedding_dim,
                 )
@@ -126,7 +127,7 @@ class GlobalSearcher:
 
         all_results = []
         for bag_path in self._compatible_bags(bag_paths):
-            db_path = resolve_artifact_path(bag_path=Path(bag_path)) / "lancedb"
+            db_path = artifacts_for_bag(Path(bag_path)).lancedb_dir
             if not db_path.exists():
                 logger.warning(
                     "Skipping %s: no LanceDB index found.", Path(bag_path).name

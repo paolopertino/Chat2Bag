@@ -5,7 +5,7 @@ import lancedb
 import numpy as np
 
 from src.core.app_config import get_app_config
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 from src.retriever.global_search import GlobalSearcher
 from tests.fakes import FakeEmbedder
 
@@ -13,7 +13,7 @@ from tests.fakes import FakeEmbedder
 def _build_bag(tmp_path):
     cfg = get_app_config()
     bag = tmp_path / "bag"
-    artifact = resolve_artifact_path(bag_path=bag)
+    artifact = artifacts_for_bag(bag).dir
     (artifact / "lancedb").mkdir(parents=True)
     dim = 4
     # 3 frames; frame 0 is inside the area, frames 1,2 outside. Timestamps 30s apart to avoid temporal dedup.

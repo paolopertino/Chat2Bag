@@ -1,4 +1,3 @@
-import json
 import logging
 
 from collections import defaultdict
@@ -10,8 +9,8 @@ import numpy as np
 from PIL import Image
 
 from src.core.app_config import AppConfig, get_app_config
-from src.core.index_stamp import is_region_stamp_compatible, read_region_stamp
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
+from data_extraction_lib.artifacts import BagArtifacts, Metadata
 from data_extraction_lib.embedding import FrameEmbedder, create_embedder
 
 from src.core.embedding_settings import embedding_settings_from_config
@@ -62,14 +61,15 @@ class RegionSearcher:
                 kept.append(candidate)
         return kept
 
-    def _compatible_region_bags(self, bag_paths: List[str]) -> list[tuple[str, Path, list[dict]]]:
+    def _compatible_region_bags(
+        self, bag_paths: List[str]
+    ) -> list[tuple[str, BagArtifacts, list[dict]]]:
         keep = []
         for bag_path in bag_paths:
-            artifact = resolve_artifact_path(bag_path=Path(bag_path))
-            meta_path = artifact / "metadata.json"
-            stamp = read_region_stamp(meta_path)
-            if not is_region_stamp_compatible(
-                stamp, self._embedder.name, self._embedder.embedding_dim,
+            artifacts = artifacts_for_bag(Path(bag_path))
+            meta = Metadata.try_load(artifacts)
+            if meta is None or not meta.region_compatible_with(
+                self._embedder.name, self._embedder.embedding_dim,
                 "value-attention", int(self._embedder.encode_long_side or -1),
             ):
                 logger.warning(
@@ -77,15 +77,12 @@ class RegionSearcher:
                     Path(bag_path).name,
                 )
                 continue
-            region_dir = artifact / "region"
-            if not (region_dir / "patches.faiss").exists():
+            if not (artifacts.region_dir / "patches.faiss").exists():
                 logger.warning(
                     "Skipping %s: region stamp present but patches.faiss missing", Path(bag_path).name
                 )
                 continue
-            with meta_path.open("r", encoding="utf-8") as handle:
-                frames = json.load(handle).get("frames", [])
-            keep.append((bag_path, artifact, frames))
+            keep.append((bag_path, artifacts, meta.frames))
         return keep
 
     def _get_index(self, region_dir: Path) -> FaissPatchIndex:
@@ -103,8 +100,8 @@ class RegionSearcher:
         area_obj = parse_area_payload(area)
         all_results: list[dict] = []
 
-        for bag_path, artifact, frames in self._compatible_region_bags(bag_paths):
-            index = self._get_index(artifact / "region")
+        for bag_path, artifacts, frames in self._compatible_region_bags(bag_paths):
+            index = self._get_index(artifacts.region_dir)
             allowed_frame_ids = None
             if area_obj is not None:
                 allowed_frame_ids = set(frames_in_area(area_obj, frames))
@@ -123,7 +120,7 @@ class RegionSearcher:
                 if fid < 0 or fid >= len(frames):
                     continue
                 frame = frames[fid]
-                abs_path = str(artifact / frame["file_path"])
+                abs_path = str(artifacts.dir / frame["file_path"])
                 if exclude_path and str(Path(abs_path).resolve()) == exclude_path:
                     continue
                 sclist.sort(reverse=True)
