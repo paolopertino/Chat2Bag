@@ -393,7 +393,7 @@ export function ExtractDatasetDialog({
               ))}
             </div>
           ) : null}
-
+                                                                                     
           {/* Named-object-list fields (e.g. topics) */}
           {listFields.map((field) => {
             const allItems = (schema?.defaults[field] ?? []) as TopicItem[];

@@ -477,6 +477,7 @@ embedding = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pillow" },
+    { name = "sentencepiece" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -485,6 +486,7 @@ embedding = [
 requires-dist = [
     { name = "numpy", marker = "extra == 'embedding'" },
     { name = "pillow", marker = "extra == 'embedding'" },
+    { name = "sentencepiece", marker = "extra == 'embedding'" },
     { name = "torch", marker = "extra == 'embedding'" },
     { name = "transformers", marker = "extra == 'embedding'" },
 ]
