@@ -91,7 +91,7 @@ dependencies = [
     { name = "accelerate" },
     { name = "aiosqlite" },
     { name = "bcrypt" },
-    { name = "data-extraction-lib", extra = ["embedding"] },
+    { name = "data-extraction-lib", extra = ["embedding", "ros2"] },
     { name = "faiss-cpu" },
     { name = "fastapi" },
     { name = "lancedb" },
@@ -129,7 +129,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.12.0" },
     { name = "aiosqlite", specifier = ">=0.20.0" },
     { name = "bcrypt", specifier = "<4" },
-    { name = "data-extraction-lib", extras = ["embedding"], editable = "../data-extraction-lib" },
+    { name = "data-extraction-lib", extras = ["embedding", "ros2"], editable = "../data-extraction-lib" },
     { name = "faiss-cpu", specifier = ">=1.14.2" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "lancedb", specifier = ">=0.27.1" },
@@ -481,16 +481,27 @@ embedding = [
     { name = "torch" },
     { name = "transformers" },
 ]
+ros2 = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "opencv-python" },
+    { name = "rosbags" },
+    { name = "rosbags-image" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "numpy", marker = "extra == 'embedding'" },
+    { name = "numpy", marker = "extra == 'ros2'", specifier = ">=2.2.6" },
+    { name = "opencv-python", marker = "extra == 'ros2'", specifier = ">=4.13.0.92" },
     { name = "pillow", marker = "extra == 'embedding'" },
+    { name = "rosbags", marker = "extra == 'ros2'", specifier = ">=0.11.0" },
+    { name = "rosbags-image", marker = "extra == 'ros2'", specifier = ">=0.10.3" },
     { name = "sentencepiece", marker = "extra == 'embedding'" },
     { name = "torch", marker = "extra == 'embedding'" },
     { name = "transformers", marker = "extra == 'embedding'" },
 ]
-provides-extras = ["embedding"]
+provides-extras = ["embedding", "ros2"]
 
 [package.metadata.requires-dev]
 dev = [
