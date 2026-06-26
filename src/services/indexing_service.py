@@ -50,8 +50,8 @@ class IndexingService:
         # (before build_index runs) cannot leave the bag reading as indexed.
         IndexManifest.delete(artifacts_for_bag(Path(resolved_bag_path)))
         try:
-            parser = self._factory.create_bag_parser(resolved_bag_path)
-            parser.extract_frames()
+            extractor = self._factory.create_bag_extractor(resolved_bag_path)
+            extractor.extract()
             indexer = self._factory.create_indexer(resolved_bag_path)
             indexer.build_index()
             self._status_store[resolved_bag_path] = "done"

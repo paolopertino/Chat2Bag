@@ -4,7 +4,7 @@ from data_extraction_lib.embedding import FrameEmbedder
 
 from src.core.app_config import AppConfig
 from src.core.storage import artifacts_for_bag
-from src.ingestion.bag_parser import BagParser
+from src.ingestion.extraction import BagExtractor
 from src.ingestion.indexer import Indexer
 from src.region.dense_indexer import DensePatchIndexer
 from src.region.region_search import RegionSearcher
@@ -17,8 +17,8 @@ class BackendComponentFactory:
         self._config = config
         self._embedder = embedder
 
-    def create_bag_parser(self, bag_path: str) -> BagParser:
-        return BagParser(bag_path=bag_path, config=self._config)
+    def create_bag_extractor(self, bag_path: str) -> BagExtractor:
+        return BagExtractor(bag_path=bag_path, config=self._config)
 
     def create_indexer(self, bag_path: str) -> Indexer:
         region_indexer = None
