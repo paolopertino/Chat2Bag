@@ -3,8 +3,8 @@ from pathlib import Path
 from src.services.indexing_service import IndexingService
 
 
-class ExplodingParser:
-    def extract_frames(self) -> None:
+class ExplodingExtractor:
+    def extract(self) -> None:
         raise Exception("Some database files are missing")
 
 
@@ -12,13 +12,13 @@ class UnusedIndexer:
     db_path = Path("/tmp/unused")
 
     def build_index(self) -> None:
-        raise AssertionError("indexer should not run after parser failure")
+        raise AssertionError("indexer should not run after extractor failure")
 
 
 class ExplodingFactory:
-    def create_bag_parser(self, bag_path: str) -> ExplodingParser:
+    def create_bag_extractor(self, bag_path: str) -> ExplodingExtractor:
         _ = bag_path
-        return ExplodingParser()
+        return ExplodingExtractor()
 
     def create_indexer(self, bag_path: str) -> UnusedIndexer:
         _ = bag_path
