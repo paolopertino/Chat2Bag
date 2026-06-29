@@ -2,9 +2,9 @@ import pytest
 
 from data_extraction_lib.artifacts import Metadata
 from data_extraction_lib.ros2.records import (
-    ExtractionResult,
     FrameRecord,
     LocatedFrame,
+    LocatedFramesResult,
     TimestampedCoordinate,
 )
 
@@ -24,7 +24,7 @@ def test_metadata_flattens_coordinate_into_frame_dicts():
     cfg = _config()
     cam = cfg.ingestion.camera_topics[0]
     gps = cfg.ingestion.gps_topic
-    result = ExtractionResult(
+    result = LocatedFramesResult(
         present_topics=[cam, gps] if gps else [cam],
         located_frames=[
             _located(1, cam, TimestampedCoordinate(1, 45.0, 10.0)),
@@ -44,7 +44,7 @@ def test_gps_stamp_present_but_empty_yields_zero_counts_not_none():
     cam, gps = cfg.ingestion.camera_topics[0], cfg.ingestion.gps_topic
     if not gps:
         pytest.skip("config has no gps_topic")
-    result = ExtractionResult(present_topics=[cam, gps], located_frames=[_located(1, cam, None)], coordinates=[])
+    result = LocatedFramesResult(present_topics=[cam, gps], located_frames=[_located(1, cam, None)], coordinates=[])
     meta = result_to_metadata(result, bag_name="bag", config=cfg)
     assert meta.gps is not None
     assert meta.gps.fix_count == 0 and meta.gps.located_frame_count == 0 and meta.gps.frame_count == 1
@@ -53,14 +53,14 @@ def test_gps_stamp_present_but_empty_yields_zero_counts_not_none():
 def test_gps_stamp_none_when_topic_absent_from_bag():
     cfg = _config()
     cam = cfg.ingestion.camera_topics[0]
-    result = ExtractionResult(present_topics=[cam], located_frames=[_located(1, cam, None)], coordinates=[])
+    result = LocatedFramesResult(present_topics=[cam], located_frames=[_located(1, cam, None)], coordinates=[])
     meta = result_to_metadata(result, bag_name="bag", config=cfg)
     assert meta.gps is None
 
 
 def test_no_camera_topics_present_raises():
     cfg = _config()
-    result = ExtractionResult(present_topics=[], located_frames=[], coordinates=[])
+    result = LocatedFramesResult(present_topics=[], located_frames=[], coordinates=[])
     with pytest.raises(ValueError):
         result_to_metadata(result, bag_name="bag", config=cfg)
 
@@ -74,8 +74,8 @@ def test_bag_extractor_end_to_end_writes_metadata(tmp_path, monkeypatch):
     import dataclasses
 
     import data_extraction_lib.ros2.reader as reader_mod
-    import data_extraction_lib.ros2.convert as convert_mod
-    import data_extraction_lib.ros2.sink as sink_mod
+    import data_extraction_lib.ros2.converters.image as convert_mod
+    import data_extraction_lib.ros2.sink.image as sink_mod
     from src.ingestion.extraction import BagExtractor
 
     base = get_app_config()

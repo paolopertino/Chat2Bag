@@ -2,8 +2,8 @@
 
 This is the Chat2Bag bridge between the library's policy-free extraction
 (`data_extraction_lib.ros2`) and the webapp's persisted artifact format
-(`data_extraction_lib.artifacts.Metadata`). The library returns an
-``ExtractionResult`` of plain facts; this module owns the Chat2Bag projection
+(`data_extraction_lib.artifacts.Metadata`). The library returns a
+``LocatedFramesResult`` of plain facts; this module owns the Chat2Bag projection
 (camera selection, lat/lon flattening, GPS-stamp gating) and the storage policy.
 """
 
@@ -16,10 +16,12 @@ from data_extraction_lib.ros2 import (
     BagReader,
     CollectSink,
     DecimationPolicy,
-    ExtractionResult,
     Frame,
+    FrameRecord,
     ImageFrameConverter,
     ImageSink,
+    LocatedFrame,
+    LocatedFramesResult,
     NavSatFixConverter,
     NearestJoinAssembly,
     PerCameraLayout,
@@ -63,14 +65,22 @@ def build_extractor(bag_path: str, config: AppConfig, artifacts) -> BagFrameExtr
         reader=BagReader(Path(bag_path)),
         selection=DecimationPolicy(rates={t: config.ingestion.sampling_fps for t in camera_topics}),
         converters=converters,
-        assembly=NearestJoinAssembly(max_gap_ns=max_gap_ns),
+        assembly=NearestJoinAssembly(
+            leader=FrameRecord,
+            attach=[TimestampedCoordinate],
+            key=lambda record: record.timestamp_ns,
+            max_gap_ns=max_gap_ns,
+            combine=lambda frame, matches: LocatedFrame(
+                frame=frame, coordinate=matches[TimestampedCoordinate]
+            ),
+        ),
         sinks=sinks,
         topics=topics,
     )
 
 
-def result_to_metadata(result: ExtractionResult, bag_name: str, config: AppConfig) -> Metadata:
-    """Project an :class:`ExtractionResult` into Chat2Bag's :class:`Metadata`.
+def result_to_metadata(result: LocatedFramesResult, bag_name: str, config: AppConfig) -> Metadata:
+    """Project a :class:`LocatedFramesResult` into Chat2Bag's :class:`Metadata`.
 
     :param result: The library extraction facts.
     :param bag_name: The bag's name (stored in metadata).
