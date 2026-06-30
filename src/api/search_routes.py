@@ -1,9 +1,16 @@
 from typing import Annotated, List, Literal, Optional, Union
 
+import anyio
+from anyio import CapacityLimiter
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_map_search_service, get_region_search_service, get_search_service
+from src.api.dependencies import (
+    get_map_search_service,
+    get_region_search_service,
+    get_search_limiter,
+    get_search_service,
+)
 from src.auth.dependencies import require_current_user
 from src.services.map_search_service import MapSearchService
 from src.services.region_search_service import RegionSearchService
@@ -14,6 +21,12 @@ router = APIRouter(
     tags=["search"],
     dependencies=[Depends(require_current_user)],
 )
+
+# Blocking, embedding/GPU-bound search work is offloaded to a worker thread so it
+# never blocks the event loop, and is bounded by the app-wide search limiter so a
+# burst of requests cannot oversubscribe the GPU. The facades are stateless per
+# call, so one shared instance is safe across these concurrent threads.
+Limiter = Annotated[Optional[CapacityLimiter], Depends(get_search_limiter)]
 
 
 class LatLon(BaseModel):
@@ -90,14 +103,18 @@ class RegionHeatmapByFrameRequest(BaseModel):
 async def search_bags(
     req: SearchRequest,
     search_service: Annotated[SearchService, Depends(get_search_service)],
+    limiter: Limiter = None,
 ):
     """Federated search across multiple bags using the shared Searcher object."""
     try:
-        results = search_service.search(
-            query=req.query,
-            bag_paths=req.bag_paths,
-            top_k=req.top_k,
-            area=req.area.model_dump() if req.area else None,
+        results = await anyio.to_thread.run_sync(
+            lambda: search_service.search(
+                query=req.query,
+                bag_paths=req.bag_paths,
+                top_k=req.top_k,
+                area=req.area.model_dump() if req.area else None,
+            ),
+            limiter=limiter,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -112,8 +129,12 @@ async def search_map(
 ):
     """Standalone Map browse: chronological, temporal-deduped in-area Frames."""
     try:
-        results = service.browse(
-            area_payload=req.area.model_dump(), bag_paths=req.bag_paths, top_k=req.top_k,
+        results = await anyio.to_thread.run_sync(
+            lambda: service.browse(
+                area_payload=req.area.model_dump(),
+                bag_paths=req.bag_paths,
+                top_k=req.top_k,
+            )
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -127,17 +148,21 @@ async def search_bags_by_image(
     bag_paths: List[str] = Form(...),
     top_k: int = Form(default=100, ge=1, le=500),
     area: Optional[str] = Form(default=None),
+    limiter: Limiter = None,
 ):
     """Federated image search across multiple bags using uploaded image content."""
     import json as _json
     try:
         image_bytes = await image.read()
         parsed_area = _json.loads(area) if area else None
-        results = search_service.search_by_image(
-            image_bytes=image_bytes,
-            bag_paths=bag_paths,
-            top_k=top_k,
-            area=parsed_area,
+        results = await anyio.to_thread.run_sync(
+            lambda: search_service.search_by_image(
+                image_bytes=image_bytes,
+                bag_paths=bag_paths,
+                top_k=top_k,
+                area=parsed_area,
+            ),
+            limiter=limiter,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -151,14 +176,18 @@ async def search_bags_by_image(
 async def search_similar_images(
     req: SimilarSearchRequest,
     search_service: Annotated[SearchService, Depends(get_search_service)],
+    limiter: Limiter = None,
 ):
     """Finds similar frames to a known frame path across selected bags."""
     try:
-        results = search_service.search_similar(
-            file_path=req.file_path,
-            bag_paths=req.bag_paths,
-            top_k=req.top_k,
-            area=req.area.model_dump() if req.area else None,
+        results = await anyio.to_thread.run_sync(
+            lambda: search_service.search_similar(
+                file_path=req.file_path,
+                bag_paths=req.bag_paths,
+                top_k=req.top_k,
+                area=req.area.model_dump() if req.area else None,
+            ),
+            limiter=limiter,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -174,11 +203,19 @@ async def search_similar_images(
 async def region_search_by_text(
     req: RegionByTextRequest,
     service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+    limiter: Limiter = None,
 ):
     """Region search across bags using a text query (template-ensembled)."""
     try:
-        results = service.search_by_text(text=req.text, bag_paths=req.bag_paths, top_k=req.top_k,
-                                          area=req.area.model_dump() if req.area else None)
+        results = await anyio.to_thread.run_sync(
+            lambda: service.search_by_text(
+                text=req.text,
+                bag_paths=req.bag_paths,
+                top_k=req.top_k,
+                area=req.area.model_dump() if req.area else None,
+            ),
+            limiter=limiter,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"query": req.text, "results": results}
@@ -188,15 +225,19 @@ async def region_search_by_text(
 async def region_search_by_frame(
     req: RegionByFrameRequest,
     service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+    limiter: Limiter = None,
 ):
     """Region search from points on an already-indexed Support Frame (self-excluded)."""
     try:
-        results = service.search_by_frame(
-            support_file_path=req.support_file_path,
-            points=[p.model_dump() for p in req.points],
-            bag_paths=req.bag_paths,
-            top_k=req.top_k,
-            area=req.area.model_dump() if req.area else None,
+        results = await anyio.to_thread.run_sync(
+            lambda: service.search_by_frame(
+                support_file_path=req.support_file_path,
+                points=[p.model_dump() for p in req.points],
+                bag_paths=req.bag_paths,
+                top_k=req.top_k,
+                area=req.area.model_dump() if req.area else None,
+            ),
+            limiter=limiter,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -215,6 +256,7 @@ async def region_search_by_image(
     bag_paths: List[str] = Form(...),
     top_k: int = Form(default=100, ge=1, le=500),
     area: Optional[str] = Form(default=None),
+    limiter: Limiter = None,
 ):
     """Region search from points on an uploaded Support image. `points` is a JSON array."""
     import json as _json
@@ -223,9 +265,15 @@ async def region_search_by_image(
         parsed_points = _json.loads(points)
         parsed_area = _json.loads(area) if area else None
         image_bytes = await image.read()
-        results = service.search_by_image(
-            image_bytes=image_bytes, points=parsed_points, bag_paths=bag_paths, top_k=top_k,
-            area=parsed_area,
+        results = await anyio.to_thread.run_sync(
+            lambda: service.search_by_image(
+                image_bytes=image_bytes,
+                points=parsed_points,
+                bag_paths=bag_paths,
+                top_k=top_k,
+                area=parsed_area,
+            ),
+            limiter=limiter,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -238,10 +286,16 @@ async def region_search_by_image(
 async def region_heatmap(
     req: RegionHeatmapTextRequest,
     service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+    limiter: Limiter = None,
 ):
     """Recomputed value-attention cosine grid for a target frame vs a text query."""
     try:
-        grid = service.heatmap_by_text(text=req.text, target_file_path=req.target_file_path)
+        grid = await anyio.to_thread.run_sync(
+            lambda: service.heatmap_by_text(
+                text=req.text, target_file_path=req.target_file_path
+            ),
+            limiter=limiter,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -255,13 +309,17 @@ async def region_heatmap(
 async def region_heatmap_by_frame(
     req: RegionHeatmapByFrameRequest,
     service: Annotated[RegionSearchService, Depends(get_region_search_service)],
+    limiter: Limiter = None,
 ):
     """Recomputed value-attention cosine grid for a target frame vs points on a Support Frame."""
     try:
-        grid = service.heatmap_by_frame(
-            support_file_path=req.support_file_path,
-            points=[p.model_dump() for p in req.points],
-            target_file_path=req.target_file_path,
+        grid = await anyio.to_thread.run_sync(
+            lambda: service.heatmap_by_frame(
+                support_file_path=req.support_file_path,
+                points=[p.model_dump() for p in req.points],
+                target_file_path=req.target_file_path,
+            ),
+            limiter=limiter,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -278,6 +336,7 @@ async def region_heatmap_by_image(
     image: UploadFile = File(...),
     points: str = Form(...),
     target_file_path: str = Form(...),
+    limiter: Limiter = None,
 ):
     """Recomputed cosine grid for a target frame vs points on an uploaded Support image."""
     import json as _json
@@ -285,8 +344,13 @@ async def region_heatmap_by_image(
     try:
         parsed_points = _json.loads(points)
         image_bytes = await image.read()
-        grid = service.heatmap_by_image(
-            image_bytes=image_bytes, points=parsed_points, target_file_path=target_file_path,
+        grid = await anyio.to_thread.run_sync(
+            lambda: service.heatmap_by_image(
+                image_bytes=image_bytes,
+                points=parsed_points,
+                target_file_path=target_file_path,
+            ),
+            limiter=limiter,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

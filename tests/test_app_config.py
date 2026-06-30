@@ -91,6 +91,29 @@ def test_gps_fields_default_when_absent(monkeypatch):
         app_config_mod.get_app_config.cache_clear()
 
 
+def test_search_max_concurrent_defaults_to_2(monkeypatch):
+    # _FAKE_SETTINGS["search"] has no max_concurrent_searches → exercises the default.
+    monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
+    app_config_mod.get_app_config.cache_clear()
+    try:
+        assert app_config_mod.get_app_config().search.max_concurrent_searches == 2
+    finally:
+        app_config_mod.get_app_config.cache_clear()
+
+
+def test_search_max_concurrent_override_honored(monkeypatch):
+    override = {
+        **_FAKE_SETTINGS,
+        "search": {**_FAKE_SETTINGS["search"], "max_concurrent_searches": 5},
+    }
+    monkeypatch.setattr(app_config_mod, "get_settings", lambda: override)
+    app_config_mod.get_app_config.cache_clear()
+    try:
+        assert app_config_mod.get_app_config().search.max_concurrent_searches == 5
+    finally:
+        app_config_mod.get_app_config.cache_clear()
+
+
 def test_ingestion_long_side_and_camera_topics_parsed(monkeypatch):
     monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
     app_config_mod.get_app_config.cache_clear()

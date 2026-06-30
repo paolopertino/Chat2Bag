@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio
 import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -100,6 +101,11 @@ async def lifespan(fastapi_app: FastAPI):
         fastapi_app.state.component_factory.create_dense_search()
     )
 
+    # Bound concurrent embedding/GPU-bound search work; the rest queue.
+    fastapi_app.state.search_limiter = anyio.CapacityLimiter(
+        config.search.max_concurrent_searches
+    )
+
     if config.extraction.enabled:
         logger.info("Dataset extraction enabled, service URL: %s", config.extraction.service_url)
     else:
@@ -112,6 +118,7 @@ async def lifespan(fastapi_app: FastAPI):
     del fastapi_app.state.global_search_instance
     if getattr(fastapi_app.state, "dense_search_instance", None) is not None:
         del fastapi_app.state.dense_search_instance
+    del fastapi_app.state.search_limiter
     del fastapi_app.state.component_factory
     del fastapi_app.state.embedder
     del fastapi_app.state.app_config

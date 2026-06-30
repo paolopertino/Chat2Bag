@@ -1,3 +1,4 @@
+from anyio import CapacityLimiter
 from fastapi import HTTPException, Request
 
 from src.api.state import indexing_errors, indexing_status
@@ -37,6 +38,15 @@ def get_region_search_service(request: Request) -> RegionSearchService:
 
 def get_map_search_service(request: Request) -> MapSearchService:
     return request.app.state.component_factory.create_map_search_service()
+
+
+def get_search_limiter(request: Request) -> CapacityLimiter | None:
+    """Concurrency limiter for the blocking, embedding-bound search work.
+
+    :returns: The app-wide :class:`anyio.CapacityLimiter`, or ``None`` when no limiter
+        is configured (offloaded work then uses anyio's default thread limiter).
+    """
+    return getattr(request.app.state, "search_limiter", None)
 
 
 def get_extraction_service(request: Request) -> ExtractionService:
