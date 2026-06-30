@@ -1,3 +1,7 @@
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 from PIL import Image
 
@@ -89,3 +93,50 @@ def test_delegates_identity_and_lifecycle():
     assert emb.to("cuda") is emb
     emb.offload()
     assert inner.offloaded is True
+
+
+class _ConcurrencyFake(_RawFake):
+    """Records the peak number of overlapping forwards inside the inner embedder."""
+
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+        self.current = 0
+        self.max_seen = 0
+
+    def _work(self):
+        with self._lock:
+            self.current += 1
+            self.max_seen = max(self.max_seen, self.current)
+        time.sleep(0.05)
+        with self._lock:
+            self.current -= 1
+
+    def embed_images(self, images):
+        self._work()
+        return super().embed_images(images)
+
+    def embed_dense_value(self, images):
+        self._work()
+        return super().embed_dense_value(images)
+
+
+def test_concurrent_embeds_are_serialized():
+    """The wrapper serializes all model forwards so the underlying embedder's shared
+    value-attention hook cannot be corrupted by overlapping forwards. A mix of image
+    and value calls from several threads must never overlap inside the inner embedder
+    (peak concurrency == 1)."""
+    inner = _ConcurrencyFake()
+    emb = NormalizingEmbedder(inner)
+    img = Image.new("RGB", (8, 8))
+
+    def call(i):
+        if i % 2 == 0:
+            emb.embed_dense_value([img])
+        else:
+            emb.embed_images([img])
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        list(ex.map(call, range(8)))
+
+    assert inner.max_seen == 1

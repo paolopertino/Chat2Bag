@@ -7,6 +7,8 @@ wraps any library embedder and L2-normalizes every output at a single seam, so a
 call sites keep that invariant and existing indexes stay valid.
 """
 
+import threading
+
 import numpy as np
 from PIL import Image
 
@@ -19,10 +21,18 @@ def _l2(rows: np.ndarray) -> np.ndarray:
 
 
 class NormalizingEmbedder(FrameEmbedder):
-    """Wraps a :class:`FrameEmbedder` and L2-normalizes all of its outputs."""
+    """Wraps a :class:`FrameEmbedder`, L2-normalizes all of its outputs, and serializes
+    its model forwards.
+
+    The inner embedder is shared process-wide and is not safe for concurrent forwards
+    (some backends register transient forward hooks on shared modules). A lock held
+    across each ``embed_*`` delegation guarantees one forward at a time, which a single
+    GPU executes serially anyway; the L2 normalization runs outside the lock.
+    """
 
     def __init__(self, inner: FrameEmbedder):
         self._inner = inner
+        self._lock = threading.Lock()
 
     @property
     def name(self) -> str:
@@ -41,16 +51,24 @@ class NormalizingEmbedder(FrameEmbedder):
         return self._inner.encode_long_side
 
     def embed_images(self, images: list[Image.Image]) -> np.ndarray:
-        return _l2(self._inner.embed_images(images))
+        with self._lock:
+            raw = self._inner.embed_images(images)
+        return _l2(raw)
 
     def embed_text(self, queries: list[str]) -> np.ndarray:
-        return _l2(self._inner.embed_text(queries))
+        with self._lock:
+            raw = self._inner.embed_text(queries)
+        return _l2(raw)
 
     def embed_dense(self, images: list[Image.Image]) -> list[tuple[np.ndarray, np.ndarray]]:
-        return [(_l2(cls), _l2(grid)) for cls, grid in self._inner.embed_dense(images)]
+        with self._lock:
+            raw = self._inner.embed_dense(images)
+        return [(_l2(cls), _l2(grid)) for cls, grid in raw]
 
     def embed_dense_value(self, images: list[Image.Image]) -> list[tuple[np.ndarray, np.ndarray]]:
-        return [(_l2(cls), _l2(grid)) for cls, grid in self._inner.embed_dense_value(images)]
+        with self._lock:
+            raw = self._inner.embed_dense_value(images)
+        return [(_l2(cls), _l2(grid)) for cls, grid in raw]
 
     def to(self, device: str) -> "NormalizingEmbedder":
         self._inner.to(device)
