@@ -92,12 +92,12 @@ async def lifespan(fastapi_app: FastAPI):
         embedder=embedder,
     )
 
-    fastapi_app.state.searcher_instance = (
-        fastapi_app.state.component_factory.create_global_searcher()
+    fastapi_app.state.global_search_instance = (
+        fastapi_app.state.component_factory.create_global_search()
     )
 
-    fastapi_app.state.region_searcher_instance = (
-        fastapi_app.state.component_factory.create_region_searcher()
+    fastapi_app.state.dense_search_instance = (
+        fastapi_app.state.component_factory.create_dense_search()
     )
 
     if config.extraction.enabled:
@@ -109,9 +109,9 @@ async def lifespan(fastapi_app: FastAPI):
 
     logger.info("Server shutting down: clearing model resources")
     fastapi_app.state.embedder.offload()
-    del fastapi_app.state.searcher_instance
-    if getattr(fastapi_app.state, "region_searcher_instance", None) is not None:
-        del fastapi_app.state.region_searcher_instance
+    del fastapi_app.state.global_search_instance
+    if getattr(fastapi_app.state, "dense_search_instance", None) is not None:
+        del fastapi_app.state.dense_search_instance
     del fastapi_app.state.component_factory
     del fastapi_app.state.embedder
     del fastapi_app.state.app_config
