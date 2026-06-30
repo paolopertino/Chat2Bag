@@ -7,8 +7,8 @@ from pathlib import Path
 from fastapi import BackgroundTasks
 
 from data_extraction_lib.artifacts import IndexManifest
+from data_extraction_lib.index import DenseSearch, GlobalSearch
 from src.core.storage import artifacts_for_bag
-from src.retriever.global_search import GlobalSearcher
 from src.services.component_factory import BackendComponentFactory
 
 logger = logging.getLogger(__name__)
@@ -19,14 +19,14 @@ class IndexingService:
         self,
         factory: BackendComponentFactory,
         status_store: MutableMapping[str, str],
-        searcher: GlobalSearcher | None = None,
-        region_searcher=None,
+        global_search: GlobalSearch | None = None,
+        dense_search: DenseSearch | None = None,
         error_store: MutableMapping[str, str] | None = None,
     ):
         self._factory = factory
         self._status_store = status_store
-        self._searcher = searcher
-        self._region_searcher = region_searcher
+        self._global_search = global_search
+        self._dense_search = dense_search
         self._error_store = error_store if error_store is not None else {}
 
     @staticmethod
@@ -52,19 +52,17 @@ class IndexingService:
         try:
             extractor = self._factory.create_bag_extractor(resolved_bag_path)
             extractor.extract()
-            indexer = self._factory.create_indexer(resolved_bag_path)
-            indexer.build_index()
+            self._factory.create_bag_index_builder(resolved_bag_path).build()
             self._status_store[resolved_bag_path] = "done"
             self._error_store.pop(resolved_bag_path, None)
             logger.info("Successfully indexed %s", resolved_bag_path)
-            if self._searcher is not None:
-                db_path = str(indexer.db_path)
-                self._searcher.invalidate_cache(db_path)
-                logger.debug("Invalidated LanceDB cache for %s", db_path)
-            if self._region_searcher is not None:
-                region_dir = str(indexer.artifact_dir / "region")
-                self._region_searcher.invalidate_cache(region_dir)
-                logger.debug("Invalidated region index cache for %s", region_dir)
+            artifacts = artifacts_for_bag(Path(resolved_bag_path))
+            if self._global_search is not None:
+                self._global_search.invalidate(artifacts)
+                logger.debug("Invalidated global search cache for %s", resolved_bag_path)
+            if self._dense_search is not None:
+                self._dense_search.invalidate(artifacts)
+                logger.debug("Invalidated dense search cache for %s", resolved_bag_path)
         except Exception as exc:  # noqa: BLE001 - any failure marks the bag as errored
             self._status_store[resolved_bag_path] = "error"
             self._error_store[resolved_bag_path] = str(exc)
