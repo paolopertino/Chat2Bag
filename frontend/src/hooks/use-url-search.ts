@@ -118,7 +118,10 @@ export function useUrlSearch(options: UseUrlSearchOptions = {}) {
 
   const clear = useCallback(() => {
     writeUrl({ q: null, similar: null });
-  }, [writeUrl]);
+    // Image searches keep their results in useSearch state with no URL trigger,
+    // so clearing the URL params alone would leave them showing. Clear directly.
+    search.clearResults();
+  }, [writeUrl, search]);
 
   const setTopK = useCallback(
     (k: number) => {

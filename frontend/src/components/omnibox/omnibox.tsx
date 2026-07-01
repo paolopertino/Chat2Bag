@@ -69,7 +69,7 @@ export function Omnibox({
           <SupportChip
             pointCount={search.points.length}
             onEdit={() => setDialogOpen(true)}
-            onClear={() => search.setSupport(null)}
+            onClear={() => search.clearSupport()}
           />
         ) : null}
 

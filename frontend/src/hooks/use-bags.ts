@@ -160,6 +160,8 @@ export function useBagsState() {
               status: next.status,
               is_indexed: next.status === "done" || bag.is_indexed,
               error_message: next.error_message ?? null,
+              is_located: next.is_located ?? bag.is_located,
+              located_frame_count: next.located_frame_count ?? bag.located_frame_count,
             };
           }),
         );

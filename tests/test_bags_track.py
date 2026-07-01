@@ -52,3 +52,20 @@ def test_info_reports_is_located(tmp_path, bypass_auth):
     body = resp.json()
     assert body["is_located"] is True
     assert body["located_frame_count"] == 2
+
+
+def test_status_reports_is_located(tmp_path, bypass_auth):
+    bag = _bag(tmp_path)
+    resp = _client(bypass_auth).get(f"/api/bags/status?bag_path={bag}")
+    body = resp.json()
+    assert body["is_located"] is True
+    assert body["located_frame_count"] == 2
+
+
+def test_status_reports_not_located_without_metadata(tmp_path, bypass_auth):
+    bag = tmp_path / "no_meta_bag"
+    bag.mkdir()
+    resp = _client(bypass_auth).get(f"/api/bags/status?bag_path={bag.resolve()}")
+    body = resp.json()
+    assert body["is_located"] is False
+    assert body["located_frame_count"] == 0

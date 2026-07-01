@@ -19,6 +19,8 @@ export interface BagStatusResponse {
   bag_path: string;
   status: BagStatus;
   error_message?: string | null;
+  is_located?: boolean;
+  located_frame_count?: number;
 }
 
 export interface BagInfoResponse {

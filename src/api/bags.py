@@ -183,15 +183,21 @@ async def bag_status(
         raise HTTPException(status_code=404, detail="Bag path does not exist")
 
     resolved_path = str(path)
+    artifacts = artifacts_for_bag(path)
     status = indexing_status.get(resolved_path)
 
     if status is None:
-        status = "done" if IndexManifest.is_indexed(artifacts_for_bag(path)) else "idle"
+        status = "done" if IndexManifest.is_indexed(artifacts) else "idle"
+
+    meta = Metadata.try_load(artifacts)
+    gps = meta.gps if meta is not None else None
 
     return {
         "bag_path": resolved_path,
         "status": status,
         "error_message": indexing_errors.get(resolved_path),
+        "is_located": gps.is_located if gps is not None else False,
+        "located_frame_count": gps.located_frame_count if gps is not None else 0,
     }
 
 

@@ -40,6 +40,7 @@ export interface OmniboxSearch {
   submitSupportRegion: (points: Point[], chosenFilePath?: string) => void;
   loadMore: () => void;
   clear: () => void;
+  clearSupport: () => void;
   fetchHeatmap: ReturnType<typeof useRegionSearch>["fetchHeatmap"];
 }
 
@@ -172,6 +173,16 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     url.clear();
   }
 
+  // Removing the support chip cancels the search it powered (region, or a
+  // whole-frame image/similar search), which the text-input clear can't reach
+  // because those searches carry no text. The typed query is left intact.
+  function clearSupport() {
+    setSupport(null);
+    setModality(null);
+    region.clear();
+    url.clear();
+  }
+
   return {
     text,
     setText,
@@ -198,6 +209,7 @@ export function useOmniboxSearch(options?: { scope?: { bagPaths: string[] } }): 
     submitSupportRegion,
     loadMore,
     clear,
+    clearSupport,
     fetchHeatmap: region.fetchHeatmap,
   };
 }
