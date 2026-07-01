@@ -17,6 +17,7 @@ static/
 
 # App generated artifacts
 .bag_gpt_state.json
+.bag_gpt_errors.json
 
 # Brainstorming session content
 .superpowers/
@@ -27,3 +28,9 @@ indexing_errors.json
 
 # Claude Code local settings (keep commands/ tracked)
 .claude/settings.local.json
+
+# Serena coding-agent workspace
+.serena/
+
+# Generic Agentic coding files
+docs

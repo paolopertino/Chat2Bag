@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api import bags_router
-from src.core.index_manifest import write_index_manifest
+from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest
 
 
 def _client(bypass_auth):
@@ -29,10 +29,9 @@ def test_scan_is_indexed_reflects_manifest_not_lancedb(tmp_path, bypass_auth, mo
     b = tmp_path / "bag_b"
     (b / ".bag_chat").mkdir(parents=True)
     (b / "rec.mcap").write_bytes(b"")
-    write_index_manifest(
-        b / ".bag_chat", embedder_name="x", embedder_dim=4,
-        frame_count=1, cameras=["/c"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=1, cameras=["/c"], region_index=False,
+    ).write(BagArtifacts(b / ".bag_chat"))
 
     resp = _client(bypass_auth).get("/api/bags/scan", params={"root_dir": str(tmp_path)})
     assert resp.status_code == 200
@@ -48,10 +47,9 @@ def test_scan_reports_has_raw_data(tmp_path, bypass_auth, monkeypatch):
     (raw / "rec.mcap").write_bytes(b"")
     idx = tmp_path / "idx_bag"
     (idx / ".bag_chat").mkdir(parents=True)
-    write_index_manifest(
-        idx / ".bag_chat", embedder_name="x", embedder_dim=4,
-        frame_count=1, cameras=["/c"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=1, cameras=["/c"], region_index=False,
+    ).write(BagArtifacts(idx / ".bag_chat"))
 
     resp = _client(bypass_auth).get("/api/bags/scan", params={"root_dir": str(tmp_path)})
     by_name = {x["bag_name"]: x for x in resp.json()["bags"]}
@@ -98,10 +96,9 @@ def test_status_done_from_manifest(tmp_path, bypass_auth, monkeypatch):
     _clear_stores(monkeypatch)
     bag = tmp_path / "done_bag"
     (bag / ".bag_chat").mkdir(parents=True)
-    write_index_manifest(
-        bag / ".bag_chat", embedder_name="x", embedder_dim=4,
-        frame_count=1, cameras=["/c"], region_index=False,
-    )
+    IndexManifest(
+        embedder=EmbedderStamp(name="x", dim=4), frame_count=1, cameras=["/c"], region_index=False,
+    ).write(BagArtifacts(bag / ".bag_chat"))
     resp = _client(bypass_auth).get(
         "/api/bags/status", params={"bag_path": str(bag.resolve())}
     )

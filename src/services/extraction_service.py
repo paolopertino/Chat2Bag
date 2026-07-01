@@ -6,7 +6,7 @@ from typing import Any, Optional
 import httpx
 
 from src.core.extraction_config import ExtractionConfig
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 
 
 class ExtractionServiceError(Exception):
@@ -70,7 +70,7 @@ class ExtractionService:
 
         job_id = uuid.uuid4().hex
         resolved_output = output_folder or str(
-            resolve_artifact_path(Path(bag_path))
+            artifacts_for_bag(Path(bag_path)).dir
             / self._cfg.default_output_subdir
             / job_id
         )

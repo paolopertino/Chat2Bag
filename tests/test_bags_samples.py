@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.bags import router as bags_router
-from src.core.storage import resolve_artifact_path
+from src.core.storage import artifacts_for_bag
 
 
 def _client(bypass_auth):
@@ -18,7 +18,7 @@ def _write_bag(tmp_path, metadata):
     bag = tmp_path / "bag"
     bag.mkdir()
     (bag / "sample.mcap").write_bytes(b"")
-    artifact = resolve_artifact_path(bag_path=bag)
+    artifact = artifacts_for_bag(bag).dir
     artifact.mkdir(parents=True, exist_ok=True)
     for frame in metadata["frames"]:
         path = artifact / frame["file_path"]

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from data_extraction_lib.artifacts import Metadata
+
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -17,13 +19,12 @@ def sample_tolerance_ns(sampling_fps: float) -> int:
     return int((0.5 / sampling_fps) * NANOSECONDS_PER_SECOND)
 
 
-def camera_list(metadata: dict[str, Any]) -> list[str]:
-    cameras = metadata.get("cameras")
-    if isinstance(cameras, list) and cameras:
-        return [str(camera) for camera in cameras]
+def camera_list(metadata: Metadata) -> list[str]:
+    if metadata.cameras:
+        return [str(camera) for camera in metadata.cameras]
 
     seen: list[str] = []
-    for frame in metadata.get("frames", []):
+    for frame in metadata.frames:
         topic = frame.get("topic")
         if topic is None:
             continue
@@ -56,9 +57,9 @@ def _frame_info(
     return info
 
 
-def _frames_by_camera(metadata: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def _frames_by_camera(metadata: Metadata) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
-    for frame in metadata.get("frames", []):
+    for frame in metadata.frames:
         if "timestamp_ns" not in frame or "topic" not in frame or "file_path" not in frame:
             continue
         grouped.setdefault(str(frame["topic"]), []).append(frame)
@@ -77,7 +78,7 @@ def _nearest_frame(
 
 def _find_focus_frame(
     artifact_dir: Path,
-    metadata: dict[str, Any],
+    metadata: Metadata,
     focus_file_path: str,
 ) -> dict[str, Any]:
     raw_focus = Path(focus_file_path).expanduser()
@@ -86,7 +87,7 @@ def _find_focus_frame(
         if raw_focus.is_absolute()
         else (artifact_dir / raw_focus).resolve()
     )
-    for frame in metadata.get("frames", []):
+    for frame in metadata.frames:
         if "file_path" not in frame:
             continue
         if _absolute_frame_path(artifact_dir, frame) == focus_abs:
@@ -133,7 +134,7 @@ def build_samples_response(
     *,
     bag_path: Path,
     artifact_dir: Path,
-    metadata: dict[str, Any],
+    metadata: Metadata,
     start_ns: int,
     duration_sec: float,
     sampling_fps: float,

@@ -1,6 +1,12 @@
+from pathlib import Path
+
+from data_extraction_lib.artifacts import Metadata
+from data_extraction_lib.geo import Circle, haversine
+from data_extraction_lib.index import frames_in_area
+
 from src.core.app_config import AppConfig, get_app_config
-from src.geo.area import Circle, area_from_payload, haversine
-from src.geo.locator import resolve_area_to_frames
+from src.core.storage import artifacts_for_bag
+from src.geo.area_payload import parse_area_payload
 
 
 class MapSearchService:
@@ -14,25 +20,31 @@ class MapSearchService:
     def browse(self, area_payload: dict, bag_paths: list[str], top_k: int | None = None) -> list[dict]:
         if not bag_paths:
             raise ValueError("Must provide at least one bag path.")
-        area = area_from_payload(area_payload)
+        area = parse_area_payload(area_payload)
         if area is None:
             raise ValueError("An area is required for map browse.")
 
         rows: list[dict] = []
-        per_bag = resolve_area_to_frames(area, bag_paths)
-        for bag_path, located in per_bag.items():
-            for lf in located:
-                row = {
+        for bag_path in bag_paths:
+            artifacts = artifacts_for_bag(Path(bag_path))
+            meta = Metadata.try_load(artifacts)
+            if meta is None:
+                continue
+            entries = meta.frame_entries()
+            for pos in frames_in_area(area, entries):
+                entry = entries[pos]
+                row: dict = {
                     "bag_path": bag_path,
-                    "timestamp_ns": lf.timestamp_ns,
-                    "file_path": lf.file_path,
-                    "topic": lf.topic,
+                    "timestamp_ns": entry.timestamp_ns,
+                    "file_path": str(artifacts.dir / entry.file_path),
+                    "topic": entry.topic,
                     "source_bag": bag_path.rstrip("/").split("/")[-1],
-                    "lat": lf.lat,
-                    "lon": lf.lon,
+                    "lat": entry.coordinate.lat,
+                    "lon": entry.coordinate.lon,
                 }
-                if isinstance(area, Circle):
-                    row["distance_m"] = haversine(area.lat, area.lon, lf.lat, lf.lon)
+                if len(area.geometries) == 1 and isinstance(area.geometries[0], Circle):
+                    center = area.geometries[0].center
+                    row["distance_m"] = haversine(center.lat, center.lon, entry.coordinate.lat, entry.coordinate.lon)
                 rows.append(row)
 
         rows.sort(key=lambda r: (r["bag_path"], r["timestamp_ns"]))

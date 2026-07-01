@@ -1,3 +1,4 @@
+from anyio import CapacityLimiter
 from fastapi import HTTPException, Request
 
 from src.api.state import indexing_errors, indexing_status
@@ -12,28 +13,40 @@ def get_indexing_service(request: Request) -> IndexingService:
     return IndexingService(
         factory=request.app.state.component_factory,
         status_store=indexing_status,
-        searcher=request.app.state.searcher_instance,
-        region_searcher=getattr(request.app.state, "region_searcher_instance", None),
+        global_search=request.app.state.global_search_instance,
+        dense_search=getattr(request.app.state, "dense_search_instance", None),
         error_store=indexing_errors,
     )
 
 
 def get_search_service(request: Request) -> SearchService:
-    return SearchService(searcher=request.app.state.searcher_instance)
+    return SearchService(
+        global_search=request.app.state.global_search_instance,
+        config=request.app.state.app_config,
+    )
 
 
 def get_region_search_service(request: Request) -> RegionSearchService:
-    searcher = getattr(request.app.state, "region_searcher_instance", None)
-    if searcher is None:
+    dense = getattr(request.app.state, "dense_search_instance", None)
+    if dense is None:
         raise HTTPException(
             status_code=400,
             detail="Region search is not available with the active embedding backend.",
         )
-    return RegionSearchService(searcher=searcher)
+    return RegionSearchService(dense_search=dense, config=request.app.state.app_config)
 
 
 def get_map_search_service(request: Request) -> MapSearchService:
     return request.app.state.component_factory.create_map_search_service()
+
+
+def get_search_limiter(request: Request) -> CapacityLimiter | None:
+    """Concurrency limiter for the blocking, embedding-bound search work.
+
+    :returns: The app-wide :class:`anyio.CapacityLimiter`, or ``None`` when no limiter
+        is configured (offloaded work then uses anyio's default thread limiter).
+    """
+    return getattr(request.app.state, "search_limiter", None)
 
 
 def get_extraction_service(request: Request) -> ExtractionService:

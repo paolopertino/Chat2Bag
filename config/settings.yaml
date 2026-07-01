@@ -24,6 +24,7 @@ models:
 search:
   temporal_dedup_window_sec: 20.0                                                             # Suppress lower-scoring hits from the same bag/topic sequence within +/- this temporal window around a better-scoring frame.
   map_browse_cap: 500             # Max Map-browse results returned after temporal dedup
+  max_concurrent_searches: 30     # Max embedding/GPU-bound search requests running their blocking work at once (the rest queue). Raise for more parallelism, set to 1 to fully serialize.
 
 region_search:
   enabled: true                 # gated by embedder 'dense' capability; off => no dense pass, no RegionSearcher

@@ -91,6 +91,7 @@ dependencies = [
     { name = "accelerate" },
     { name = "aiosqlite" },
     { name = "bcrypt" },
+    { name = "data-extraction-lib", extra = ["embedding", "index", "ros2"] },
     { name = "faiss-cpu" },
     { name = "fastapi" },
     { name = "lancedb" },
@@ -128,6 +129,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.12.0" },
     { name = "aiosqlite", specifier = ">=0.20.0" },
     { name = "bcrypt", specifier = "<4" },
+    { name = "data-extraction-lib", extras = ["embedding", "ros2", "index"], editable = "../data-extraction-lib" },
     { name = "faiss-cpu", specifier = ">=1.14.2" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "lancedb", specifier = ">=0.27.1" },
@@ -463,6 +465,59 @@ version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/02/4dbe7568a42e46582248942f54dc64ad094769532adbe21e525e4edf7bc4/cuda_pathfinder-1.3.3-py3-none-any.whl", hash = "sha256:9984b664e404f7c134954a771be8775dfd6180ea1e1aef4a5a37d4be05d9bbb1", size = 27154, upload-time = "2025-12-04T22:35:08.996Z" },
+]
+
+[[package]]
+name = "data-extraction-lib"
+version = "0.1.0"
+source = { editable = "../data-extraction-lib" }
+
+[package.optional-dependencies]
+embedding = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pillow" },
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+index = [
+    { name = "faiss-cpu" },
+    { name = "lancedb" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pillow" },
+]
+ros2 = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "opencv-python" },
+    { name = "rosbags" },
+    { name = "rosbags-image" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "faiss-cpu", marker = "extra == 'index'" },
+    { name = "lancedb", marker = "extra == 'index'" },
+    { name = "numpy", marker = "extra == 'embedding'" },
+    { name = "numpy", marker = "extra == 'index'" },
+    { name = "numpy", marker = "extra == 'ros2'", specifier = ">=2.2.6" },
+    { name = "opencv-python", marker = "extra == 'ros2'", specifier = ">=4.13.0.92" },
+    { name = "pillow", marker = "extra == 'embedding'" },
+    { name = "pillow", marker = "extra == 'index'" },
+    { name = "rosbags", marker = "extra == 'ros2'", specifier = ">=0.11.0" },
+    { name = "rosbags-image", marker = "extra == 'ros2'", specifier = ">=0.10.3" },
+    { name = "sentencepiece", marker = "extra == 'embedding'" },
+    { name = "torch", marker = "extra == 'embedding'" },
+    { name = "transformers", marker = "extra == 'embedding'" },
+]
+provides-extras = ["embedding", "ros2", "index"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.1.0" },
+    { name = "ruff", specifier = ">=0.15.18" },
 ]
 
 [[package]]

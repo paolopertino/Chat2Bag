@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio
 import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,7 +68,10 @@ async def lifespan(fastapi_app: FastAPI):
         indexing_status[bag_path] = "error"
 
     # Resolve compute device once at startup and share across all components.
-    from src.embedding import create_embedder
+    from data_extraction_lib.embedding import create_embedder
+
+    from src.core.embedding_settings import embedding_settings_from_config
+    from src.core.normalizing_embedder import NormalizingEmbedder
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Using compute device: %s", device)
@@ -76,7 +80,9 @@ async def lifespan(fastapi_app: FastAPI):
     if not os.path.exists(model_checkpoints_path):
         os.makedirs(model_checkpoints_path, exist_ok=True)
 
-    embedder = create_embedder(config, device=device)
+    embedder = NormalizingEmbedder(
+        create_embedder(embedding_settings_from_config(config), device=device)
+    )
     logger.info("Active embedder: %s (dim=%d)", embedder.name, embedder.embedding_dim)
 
     fastapi_app.state.app_config = config
@@ -87,12 +93,17 @@ async def lifespan(fastapi_app: FastAPI):
         embedder=embedder,
     )
 
-    fastapi_app.state.searcher_instance = (
-        fastapi_app.state.component_factory.create_global_searcher()
+    fastapi_app.state.global_search_instance = (
+        fastapi_app.state.component_factory.create_global_search()
     )
 
-    fastapi_app.state.region_searcher_instance = (
-        fastapi_app.state.component_factory.create_region_searcher()
+    fastapi_app.state.dense_search_instance = (
+        fastapi_app.state.component_factory.create_dense_search()
+    )
+
+    # Bound concurrent embedding/GPU-bound search work; the rest queue.
+    fastapi_app.state.search_limiter = anyio.CapacityLimiter(
+        config.search.max_concurrent_searches
     )
 
     if config.extraction.enabled:
@@ -104,9 +115,10 @@ async def lifespan(fastapi_app: FastAPI):
 
     logger.info("Server shutting down: clearing model resources")
     fastapi_app.state.embedder.offload()
-    del fastapi_app.state.searcher_instance
-    if getattr(fastapi_app.state, "region_searcher_instance", None) is not None:
-        del fastapi_app.state.region_searcher_instance
+    del fastapi_app.state.global_search_instance
+    if getattr(fastapi_app.state, "dense_search_instance", None) is not None:
+        del fastapi_app.state.dense_search_instance
+    del fastapi_app.state.search_limiter
     del fastapi_app.state.component_factory
     del fastapi_app.state.embedder
     del fastapi_app.state.app_config

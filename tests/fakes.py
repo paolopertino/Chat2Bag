@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 
-from src.embedding import FrameEmbedder
+from data_extraction_lib.embedding import FrameEmbedder
 
 
 class FakeEmbedder(FrameEmbedder):
@@ -53,7 +53,7 @@ class FakeDenseEmbedder(FakeEmbedder):
     def encode_long_side(self) -> int | None:
         return self._encode_long_side
 
-    def embed_global_and_dense(self, images):
+    def embed_dense_value(self, images):
         out = []
         for i, _ in enumerate(images):
             cls = np.eye(self._dim, dtype=np.float32)[i % self._dim]
@@ -63,4 +63,4 @@ class FakeDenseEmbedder(FakeEmbedder):
         return out
 
     def embed_dense(self, images):
-        return [grid for _, grid in self.embed_global_and_dense(images)]
+        return self.embed_dense_value(images)

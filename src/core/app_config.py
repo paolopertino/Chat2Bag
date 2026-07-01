@@ -38,6 +38,7 @@ class EmbeddingConfig:
 class SearchConfig:
     temporal_dedup_window_sec: float
     map_browse_cap: int
+    max_concurrent_searches: int
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,9 @@ def get_app_config() -> AppConfig:
                 settings.get("search", {}).get("temporal_dedup_window_sec", 0.0)
             ),
             map_browse_cap=int(settings.get("search", {}).get("map_browse_cap", 500)),
+            max_concurrent_searches=int(
+                settings.get("search", {}).get("max_concurrent_searches", 2)
+            ),
         ),
         api=ApiConfig(
             scan_timeout_sec=float(
