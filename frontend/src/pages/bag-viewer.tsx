@@ -13,6 +13,7 @@ import { useHeatmaps } from "../hooks/use-heatmaps";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import { useSampleBrowser } from "../hooks/use-sample-browser";
 import { decodeBagId } from "../lib/bag-id";
+import { DEFAULT_WINDOW_S, clampNs } from "../lib/extraction-window";
 import { framesFromSample } from "../lib/region-support";
 
 export function BagViewerPage() {
@@ -22,7 +23,7 @@ export function BagViewerPage() {
   const browser = useSampleBrowser();
   const [editMode, setEditMode] = useState(false);
   const [bagRange, setBagRange] = useState<{ first: number; last: number } | null>(null);
-  const [extractTimestampNs, setExtractTimestampNs] = useState<number | null>(null);
+  const [extractWindow, setExtractWindow] = useState<{ startNs: number; endNs: number } | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [showHeatmaps, setShowHeatmaps] = useState(false);
 
@@ -121,11 +122,14 @@ export function BagViewerPage() {
           ) : null}
           <button
             className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs"
-            onClick={() =>
-              setExtractTimestampNs(
-                browser.activeSample?.timestamp_ns ?? bagRange?.first ?? 0,
-              )
-            }
+            onClick={() => {
+              if (!bagRange) return;
+              const start = browser.activeSample?.timestamp_ns ?? bagRange.first;
+              setExtractWindow({
+                startNs: start,
+                endNs: clampNs(start + DEFAULT_WINDOW_S * 1e9, bagRange.first, bagRange.last),
+              });
+            }}
           >
             Extract…
           </button>
@@ -184,12 +188,17 @@ export function BagViewerPage() {
         />
       ) : null}
 
-      {extractTimestampNs !== null && bagPath ? (
+      {extractWindow && bagRange ? (
         <ExtractDialog
           bagPath={bagPath}
-          timestampNs={extractTimestampNs}
+          bagName={bagName}
+          firstNs={bagRange.first}
+          lastNs={bagRange.last}
+          initialWindow={extractWindow}
           open
-          onOpenChange={(o) => { if (!o) setExtractTimestampNs(null); }}
+          onOpenChange={(o) => {
+            if (!o) setExtractWindow(null);
+          }}
         />
       ) : null}
     </div>
