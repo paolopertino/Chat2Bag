@@ -80,6 +80,18 @@ export function ExtractDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Schema can resolve after the dialog is already open (e.g. the service was
+  // still starting up). Hydrate once it arrives, but only if the form hasn't
+  // been hydrated yet, so this never clobbers in-progress edits.
+  useEffect(() => {
+    if (!open || !schema) return;
+    if (topicState.topics.length > 0) return;
+    const { scalars: s, topicState: ts } = hydrate(schema, loadStore());
+    setScalars(s);
+    setTopicState(ts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, schema]);
+
   const lengthS = useMemo(() => windowLengthS({ startNs, endNs }), [startNs, endNs]);
   const available = schema?.enabled ?? false;
   const windowValid = mode === "full" || endNs > startNs;
@@ -181,8 +193,8 @@ export function ExtractDialog({
             Extraction service is not available. Start the dataset-generation service and reload the page.
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1">
-            <nav className="flex w-44 flex-col gap-1 border-r border-[var(--line)] p-2">
+          <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+            <nav className="flex w-full flex-row gap-1 overflow-x-auto border-b border-[var(--line)] p-2 sm:w-44 sm:flex-col sm:border-b-0 sm:border-r">
               {navItems.map((item) => (
                 <button
                   key={item.key}

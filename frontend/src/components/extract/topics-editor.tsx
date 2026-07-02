@@ -90,6 +90,12 @@ export function TopicsEditor({ state, onChange }: TopicsEditorProps) {
         </span>
       </div>
 
+      {state.leader && !includedSet.has(state.leader) ? (
+        <p className="mb-3 text-[11px] text-amber-400">
+          The sync leader is excluded. Include it or pick another included topic as leader before extracting.
+        </p>
+      ) : null}
+
       {groups.map((group) => (
         <div key={group.key} className="mb-3">
           <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide opacity-55">

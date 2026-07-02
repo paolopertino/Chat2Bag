@@ -52,13 +52,33 @@ function serverLeader(topics: ExtractionTopic[]): string | null {
   return leader ? leader.name : null;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStoredTopicOverride(value: unknown): value is StoredTopicOverride {
+  if (!isPlainObject(value)) return false;
+  if (typeof value.included !== "boolean") return false;
+  if (value.topic_path !== undefined && typeof value.topic_path !== "string") return false;
+  return true;
+}
+
+function isStoredConfig(value: unknown): value is StoredConfig {
+  if (!isPlainObject(value)) return false;
+  if (value.version !== 1) return false;
+  if (!isPlainObject(value.scalars)) return false;
+  if (!isPlainObject(value.topics)) return false;
+  if (!Object.values(value.topics).every(isStoredTopicOverride)) return false;
+  if (typeof value.leader !== "string" && value.leader !== null) return false;
+  return true;
+}
+
 export function loadStore(): StoredConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredConfig;
-    if (!parsed || parsed.version !== 1) return null;
-    return parsed;
+    const parsed: unknown = JSON.parse(raw);
+    return isStoredConfig(parsed) ? parsed : null;
   } catch {
     return null;
   }
