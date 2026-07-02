@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ChangeEvent } from "react";
 
-type WidgetKind = "path" | "text" | "number" | "int" | "toggle" | "topics";
+type WidgetKind = "path" | "text" | "number" | "int" | "toggle" | "list" | "json";
 
 interface FieldPresentation {
   label: string;
@@ -18,17 +18,25 @@ const PRESENTATION: Record<string, FieldPresentation> = {
   sync_threshold: { label: "Sync threshold (s)", widget: "number", step: 0.01, min: 0 },
   n_workers: { label: "Workers", widget: "int", min: 1 },
   save_on_disk: { label: "Save on disk", widget: "toggle" },
-  topics: { label: "Topics", widget: "topics" },
+  // The extraction service returns `topics` as a list of structured topic
+  // descriptors (name/topic_path/modality/group/...), not plain strings, so it
+  // is edited as JSON rather than a string chip list.
+  topics: { label: "Topics", widget: "json" },
 };
 
 function prettify(key: string): string {
   return key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
+function isPrimitive(value: unknown): boolean {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
 function inferWidget(value: unknown): WidgetKind {
   if (typeof value === "boolean") return "toggle";
   if (typeof value === "number") return "number";
-  if (Array.isArray(value)) return "topics";
+  if (Array.isArray(value)) return value.every(isPrimitive) ? "list" : "json";
+  if (value !== null && typeof value === "object") return "json";
   return "text";
 }
 
@@ -65,12 +73,18 @@ export function ExtractionFields({ editableFields, defaults, values, onChange }:
           );
         }
 
-        if (p.widget === "topics") {
+        if (p.widget === "json") {
           return (
-            <TopicsEditor
+            <JsonField key={field} label={p.label} value={value} onChange={(next) => onChange(field, next)} />
+          );
+        }
+
+        if (p.widget === "list") {
+          return (
+            <ListEditor
               key={field}
               label={p.label}
-              value={Array.isArray(value) ? (value as string[]) : []}
+              value={Array.isArray(value) ? value.map((v) => String(v)) : []}
               onChange={(next) => onChange(field, next)}
             />
           );
@@ -104,7 +118,51 @@ export function ExtractionFields({ editableFields, defaults, values, onChange }:
   );
 }
 
-function TopicsEditor({
+// Edits arbitrarily-shaped config values (objects, arrays of objects) as JSON
+// text. Parses on every keystroke; while the text is not valid JSON the parent
+// value is left unchanged and the field is marked invalid, so a half-typed edit
+// never propagates a broken value into the submit payload.
+function JsonField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}) {
+  const [text, setText] = useState(() => JSON.stringify(value ?? null, null, 2));
+  const [invalid, setInvalid] = useState(false);
+
+  const onText = (next: string) => {
+    setText(next);
+    try {
+      const parsed = JSON.parse(next);
+      setInvalid(false);
+      onChange(parsed);
+    } catch {
+      setInvalid(true);
+    }
+  };
+
+  return (
+    <label className="block text-xs">
+      <span className="opacity-70">{label}</span>
+      <textarea
+        className={
+          "mt-1 h-32 w-full rounded border bg-transparent px-2 py-1 font-mono text-[11px] " +
+          (invalid ? "border-red-400" : "border-[var(--line)]")
+        }
+        spellCheck={false}
+        value={text}
+        onChange={(e) => onText(e.target.value)}
+      />
+      {invalid ? <span className="mt-0.5 block text-[10px] text-red-400">Invalid JSON</span> : null}
+    </label>
+  );
+}
+
+function ListEditor({
   label,
   value,
   onChange,
@@ -139,7 +197,7 @@ function TopicsEditor({
       <div className="mt-1 flex gap-1">
         <input
           className="w-full rounded border border-[var(--line)] bg-transparent px-2 py-1"
-          placeholder="/topic/name"
+          placeholder="value"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

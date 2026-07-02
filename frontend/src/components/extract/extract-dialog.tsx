@@ -107,7 +107,7 @@ export function ExtractDialog({
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="max-h-[85vh] w-96 overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+        className="max-h-[85vh] w-[34rem] max-w-[92vw] overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-1 text-sm font-semibold">Extract dataset</h2>
