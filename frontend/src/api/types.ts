@@ -132,6 +132,17 @@ export interface ExtractionConfigSchema {
   fixed_overrides_preview: Record<string, unknown>;
 }
 
+export interface ExtractionTopic {
+  name: string;
+  topic_path: string;
+  modality: string;
+  group: string;
+  is_sync_leader: boolean;
+  file_extension: string;
+  field_names?: string[];
+  [key: string]: unknown;
+}
+
 export interface ExtractionSubmitRequest {
   bag_path: string;
   mode: "window" | "full";
