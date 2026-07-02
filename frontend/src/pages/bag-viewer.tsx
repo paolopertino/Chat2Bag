@@ -9,11 +9,12 @@ import { Omnibox } from "../components/omnibox/omnibox";
 import { ResultsRail } from "../components/search/results-rail";
 import { SampleGridViewer } from "../components/samples/sample-grid-viewer";
 import { TimelineBar } from "../components/samples/timeline-bar";
+import { useJobs } from "../context/jobs-context";
 import { useHeatmaps } from "../hooks/use-heatmaps";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import { useSampleBrowser } from "../hooks/use-sample-browser";
 import { decodeBagId } from "../lib/bag-id";
-import { DEFAULT_WINDOW_S, clampNs } from "../lib/extraction-window";
+import { SEED_HALF_SPAN_S, formatWindowTime, seedWindow, windowLengthS } from "../lib/extraction-window";
 import { framesFromSample } from "../lib/region-support";
 
 export function BagViewerPage() {
@@ -24,6 +25,8 @@ export function BagViewerPage() {
   const [editMode, setEditMode] = useState(false);
   const [bagRange, setBagRange] = useState<{ first: number; last: number } | null>(null);
   const [extractWindow, setExtractWindow] = useState<{ startNs: number; endNs: number } | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [draftWindow, setDraftWindow] = useState<{ startNs: number; endNs: number } | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [showHeatmaps, setShowHeatmaps] = useState(false);
 
@@ -31,6 +34,7 @@ export function BagViewerPage() {
   const bagName = bagPath ? bagPath.replace(/\/+$/, "").split("/").pop()! : "";
 
   const search = useOmniboxSearch({ scope: { bagPaths: bagPath ? [bagPath] : [] } });
+  const { extractionEnabled } = useJobs();
   const regionActive = search.activeKind === "region";
 
   // Region heatmaps for the frames currently shown (the timeline's active sample).
@@ -86,6 +90,21 @@ export function BagViewerPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [browser.selectPreviousSample, browser.selectNextSample]);
 
+  useEffect(() => {
+    if (!selectMode) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSelectMode(false);
+        setDraftWindow(null);
+      } else if (e.key === "Enter" && draftWindow && draftWindow.endNs > draftWindow.startNs) {
+        setExtractWindow(draftWindow);
+        setSelectMode(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectMode, draftWindow]);
+
   if (!bagPath) return null;
 
   return (
@@ -121,14 +140,14 @@ export function BagViewerPage() {
             </button>
           ) : null}
           <button
-            className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs"
+            className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-40"
+            disabled={!extractionEnabled || !bagRange}
+            title={!extractionEnabled ? "Extraction service offline" : undefined}
             onClick={() => {
               if (!bagRange) return;
-              const start = browser.activeSample?.timestamp_ns ?? bagRange.first;
-              setExtractWindow({
-                startNs: start,
-                endNs: clampNs(start + DEFAULT_WINDOW_S * 1e9, bagRange.first, bagRange.last),
-              });
+              const center = browser.activeSample?.timestamp_ns ?? bagRange.first;
+              setDraftWindow(seedWindow(center, SEED_HALF_SPAN_S, bagRange.first, bagRange.last));
+              setSelectMode(true);
             }}
           >
             Extract…
@@ -169,6 +188,35 @@ export function BagViewerPage() {
         />
       ) : null}
 
+      {selectMode && draftWindow && bagRange ? (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="opacity-70">
+            {formatWindowTime(draftWindow.startNs, bagRange.first)} →{" "}
+            {formatWindowTime(draftWindow.endNs, bagRange.first)} · {windowLengthS(draftWindow).toFixed(1)}s
+          </span>
+          <button
+            className="rounded bg-sky-500/80 px-2 py-0.5 disabled:opacity-50"
+            disabled={draftWindow.endNs <= draftWindow.startNs}
+            onClick={() => {
+              setExtractWindow(draftWindow);
+              setSelectMode(false);
+            }}
+          >
+            Extract this window
+          </button>
+          <button
+            className="rounded border border-[var(--line)] px-2 py-0.5"
+            onClick={() => {
+              setSelectMode(false);
+              setDraftWindow(null);
+            }}
+          >
+            cancel
+          </button>
+          <span className="opacity-50">drag on the timeline to adjust</span>
+        </div>
+      ) : null}
+
       {bagRange ? (
         <TimelineBar
           samples={browser.samples}
@@ -185,6 +233,9 @@ export function BagViewerPage() {
           onLoadRight={() => void browser.loadMoreRight()}
           canLoadLeft={browser.canLoadMoreLeft}
           canLoadRight={browser.canLoadMoreRight}
+          selectMode={selectMode}
+          selectedWindow={draftWindow}
+          onWindowChange={(startNs, endNs) => setDraftWindow({ startNs, endNs })}
         />
       ) : null}
 
