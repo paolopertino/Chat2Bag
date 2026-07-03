@@ -19,6 +19,8 @@ export interface BagStatusResponse {
   bag_path: string;
   status: BagStatus;
   error_message?: string | null;
+  is_located?: boolean;
+  located_frame_count?: number;
 }
 
 export interface BagInfoResponse {
@@ -128,6 +130,17 @@ export interface ExtractionConfigSchema {
   editable_fields: string[];
   defaults: Record<string, unknown>;
   fixed_overrides_preview: Record<string, unknown>;
+}
+
+export interface ExtractionTopic {
+  name: string;
+  topic_path: string;
+  modality: string;
+  group: string;
+  is_sync_leader: boolean;
+  file_extension: string;
+  field_names?: string[];
+  [key: string]: unknown;
 }
 
 export interface ExtractionSubmitRequest {

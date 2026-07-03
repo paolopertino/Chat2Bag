@@ -82,10 +82,14 @@ class ExtractionService:
             "config": final_config,
             "output_folder": resolved_output,
         }
-        if timestamp_ns is not None:
-            payload["timestamp_ns"] = timestamp_ns
-        if window_length_s is not None:
-            payload["window_length_s"] = window_length_s
+        if timestamp_ns is not None and window_length_s is not None:
+            # The app expresses a window as [timestamp_ns, timestamp_ns + window_length_s].
+            # The microservice's extract_bag_window treats the timestamp as the window
+            # CENTER and the window size as seconds on EACH side, so translate the
+            # start/length pair into that center/half-span contract.
+            half_span_s = window_length_s / 2
+            payload["timestamp_ns"] = timestamp_ns + int(round(half_span_s * 1_000_000_000))
+            payload["window_length_s"] = half_span_s
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(f"{self._base}/extract", json=payload)

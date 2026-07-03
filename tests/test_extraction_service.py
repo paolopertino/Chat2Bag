@@ -270,6 +270,31 @@ async def test_submit_extraction_merges_config_with_fixed_winning(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_submit_extraction_translates_start_window_to_center_half_span(monkeypatch):
+    """The app expresses a window as [start, start+length]; the microservice's
+    extract_bag_window treats ``timestamp_ns`` as the window CENTER and
+    ``window_length_s`` as seconds on EACH side. The service must translate."""
+    cfg = _make_config()
+    seen = _install_mock_transport(monkeypatch, _default_handler())
+    svc = ExtractionService(cfg)
+
+    start_ns = 2_000_000_000
+    await svc.submit_extraction(
+        bag_path="/srv/bags/test_bag",
+        mode="window",
+        user_config={},
+        output_folder="/tmp/out",
+        timestamp_ns=start_ns,
+        window_length_s=10.0,
+    )
+
+    payload = json.loads(next(r for r in seen if r.url.path == "/extract").content)
+    # center = start + length/2 ; half-span = length/2
+    assert payload["timestamp_ns"] == start_ns + 5_000_000_000
+    assert payload["window_length_s"] == 5.0
+
+
+@pytest.mark.asyncio
 async def test_submit_extraction_uses_provided_output_folder(monkeypatch):
     cfg = _make_config()
     seen = _install_mock_transport(monkeypatch, _default_handler())
