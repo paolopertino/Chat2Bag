@@ -14,7 +14,9 @@ import { ResultsRail } from "../components/search/results-rail";
 import { SampleResultLightbox } from "../components/search/sample-result-lightbox";
 import { ExtractDialog } from "../components/extract/extract-dialog";
 import { JobsTab } from "../components/map/jobs-tab";
+import { getBagInfo } from "../api/client";
 import { encodeBagId } from "../lib/bag-id";
+import { DEFAULT_WINDOW_S, clampNs } from "../lib/extraction-window";
 import { useBags } from "../context/bags-context";
 import { useFleetTracks } from "../hooks/use-fleet-tracks";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
@@ -29,6 +31,7 @@ export function MapHomePage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [extractTarget, setExtractTarget] = useState<SearchResult | null>(null);
+  const [extractRange, setExtractRange] = useState<{ firstNs: number; lastNs: number } | null>(null);
   const [trackPreview, setTrackPreview] = useState<SearchResult | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const search = useOmniboxSearch();
@@ -43,6 +46,27 @@ export function MapHomePage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawMode]);
+
+  useEffect(() => {
+    if (!extractTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear stale range so reopening for a different target never shows the previous bag's range
+      setExtractRange(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const info = await getBagInfo(extractTarget.bag_path);
+      if (!cancelled) {
+        setExtractRange({
+          firstNs: info.first_timestamp_ns ?? 0,
+          lastNs: info.last_timestamp_ns ?? 0,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [extractTarget]);
 
   const openBag = (bagPath: string, timestampNs?: number) =>
     navigate(`/bags/${encodeBagId(bagPath)}${timestampNs != null ? `?t=${timestampNs}` : ""}`);
@@ -164,12 +188,27 @@ export function MapHomePage() {
           onOpenInBag={(r) => navigate(`/bags/${encodeBagId(r.bag_path)}?t=${r.timestamp_ns}`)}
         />
       ) : null}
-      {extractTarget ? (
+      {extractTarget && extractRange ? (
         <ExtractDialog
           bagPath={extractTarget.bag_path}
-          timestampNs={extractTarget.timestamp_ns}
+          bagName={extractTarget.source_bag || extractTarget.bag_path.replace(/\/+$/, "").split("/").pop()!}
+          firstNs={extractRange.firstNs}
+          lastNs={extractRange.lastNs}
+          initialWindow={{
+            startNs: extractTarget.timestamp_ns,
+            endNs: clampNs(
+              extractTarget.timestamp_ns + DEFAULT_WINDOW_S * 1e9,
+              extractRange.firstNs,
+              extractRange.lastNs,
+            ),
+          }}
           open
-          onOpenChange={(o) => { if (!o) setExtractTarget(null); }}
+          onOpenChange={(o) => {
+            if (!o) {
+              setExtractTarget(null);
+              setExtractRange(null);
+            }
+          }}
         />
       ) : null}
     </div>
