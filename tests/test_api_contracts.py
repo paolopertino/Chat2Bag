@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.dependencies import get_indexing_service, get_search_service
-from src.api.indexing import router as indexing_router
-from src.api.search_routes import router as search_router
-from src.auth.dependencies import require_current_user
-from src.auth.models import User
+from chat2bag.api.dependencies import get_indexing_service, get_search_service
+from chat2bag.api.indexing import router as indexing_router
+from chat2bag.api.search_routes import router as search_router
+from chat2bag.auth.dependencies import require_current_user
+from chat2bag.auth.models import User
 
 
 class FakeIndexingService:

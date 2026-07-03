@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bag-gpt"
 version = "0.1.0"
@@ -41,7 +45,10 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = ["."]
+pythonpath = ["backend/src", "."]
+
+[tool.setuptools.packages.find]
+where = ["backend/src"]
 
 [tool.uv.sources]
 data-extraction-lib = { path = "../data-extraction-lib", editable = true }

@@ -20,11 +20,11 @@ import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.datasets import router as datasets_router
-from src.api.dependencies import get_extraction_service
-from src.core.app_config import _parse_extraction_config
-from src.core.extraction_config import ExtractionConfig
-from src.services.extraction_service import (
+from chat2bag.api.datasets import router as datasets_router
+from chat2bag.api.dependencies import get_extraction_service
+from chat2bag.core.app_config import _parse_extraction_config
+from chat2bag.core.extraction_config import ExtractionConfig
+from chat2bag.services.extraction_service import (
     ExtractionService,
     _deep_update,
     _merge_config,
@@ -212,7 +212,7 @@ def _install_mock_transport(monkeypatch, handler) -> list[httpx.Request]:
         return original(**kwargs)
 
     monkeypatch.setattr(
-        "src.services.extraction_service.httpx.AsyncClient", patched
+        "chat2bag.services.extraction_service.httpx.AsyncClient", patched
     )
     return seen
 

@@ -17,8 +17,8 @@ from data_extraction_lib.artifacts import BagArtifacts, MetadataFrameEntry
 from data_extraction_lib.geo import Coordinate
 from data_extraction_lib.index import SearchResult
 
-from src.core.app_config import AppConfig, SearchConfig, get_app_config
-from src.services.search_service import SearchService
+from chat2bag.core.app_config import AppConfig, SearchConfig, get_app_config
+from chat2bag.services.search_service import SearchService
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ def test_search_response_contains_correct_bag_path():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     assert len(rows) == 1
@@ -109,7 +109,7 @@ def test_search_response_contains_correct_file_path():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     expected = str(ARTIFACT_DIR / RELATIVE_FRAME)
@@ -121,7 +121,7 @@ def test_search_response_contains_source_bag_basename():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     assert rows[0]["source_bag"] == "mybag.mcap"
@@ -132,7 +132,7 @@ def test_search_response_contains_scalar_fields():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     row = rows[0]
@@ -146,7 +146,7 @@ def test_search_includes_lat_lon_when_coordinate_present():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     assert rows[0]["lat"] == pytest.approx(48.0)
@@ -158,7 +158,7 @@ def test_search_excludes_lat_lon_when_no_coordinate():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         rows = svc.search("car", [BAG_PATH], top_k=5)
 
     assert "lat" not in rows[0]
@@ -171,7 +171,7 @@ def test_search_delegates_window_ns_from_config():
     fake = FakeGlobalSearch([_make_result(frame)])
     svc = SearchService(fake, _config_with_window(15.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=_make_artifacts()):
         svc.search("car", [BAG_PATH], top_k=5)
 
     assert fake.received_window_ns == 15_000_000_000
@@ -184,7 +184,7 @@ def test_search_delegates_artifacts_list_to_fake():
     expected_artifacts = _make_artifacts()
     svc = SearchService(fake, _config_with_window(20.0))
 
-    with patch("src.services.search_service.artifacts_for_bag", return_value=expected_artifacts):
+    with patch("chat2bag.services.search_service.artifacts_for_bag", return_value=expected_artifacts):
         svc.search("car", [BAG_PATH], top_k=5)
 
     assert len(fake.received_bags) == 1

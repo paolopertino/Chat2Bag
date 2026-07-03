@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.dependencies import get_map_search_service, get_search_service
-from src.api.search_routes import router as search_router
+from chat2bag.api.dependencies import get_map_search_service, get_search_service
+from chat2bag.api.search_routes import router as search_router
 
 
 class _MapStub:

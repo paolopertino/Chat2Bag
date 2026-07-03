@@ -1,6 +1,6 @@
 import json
 
-from src.api import bags as bags_mod
+from chat2bag.api import bags as bags_mod
 from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest
 
 
@@ -64,7 +64,7 @@ def test_legacy_stamp_only_folder_discovered_and_healed(tmp_path):
 
 import pytest
 
-import src.core.app_config as app_config_mod
+import chat2bag.core.app_config as app_config_mod
 
 
 def _storage_settings(storage_path):

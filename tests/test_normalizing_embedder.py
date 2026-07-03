@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from data_extraction_lib.embedding import FrameEmbedder
-from src.core.normalizing_embedder import NormalizingEmbedder
+from chat2bag.core.normalizing_embedder import NormalizingEmbedder
 
 
 class _RawFake(FrameEmbedder):

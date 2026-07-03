@@ -3,7 +3,7 @@ import time
 import pytest
 from jose import JWTError
 
-from src.auth.tokens import (
+from chat2bag.auth.tokens import (
     create_access_token,
     create_refresh_token,
     decode_access_token,

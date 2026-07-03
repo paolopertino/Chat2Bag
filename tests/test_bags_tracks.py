@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api import bags_router
+from chat2bag.api import bags_router
 
 
 def _client(bypass_auth):

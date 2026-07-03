@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.api.search_routes import (
+from chat2bag.api.search_routes import (
     RegionByFrameRequest,
     RegionByTextRequest,
     SearchRequest,

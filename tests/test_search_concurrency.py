@@ -8,8 +8,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport
 
-from src.api.dependencies import get_search_limiter, get_search_service
-from src.api.search_routes import router as search_router
+from chat2bag.api.dependencies import get_search_limiter, get_search_service
+from chat2bag.api.search_routes import router as search_router
 
 
 class _ConcurrencyStub:

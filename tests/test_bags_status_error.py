@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api import bags_router
+from chat2bag.api import bags_router
 
 
 def _client(bypass_auth):
@@ -17,8 +17,8 @@ def test_status_returns_error_message(tmp_path, bypass_auth, monkeypatch):
     bag = tmp_path / "broken_bag"
     bag.mkdir()
     resolved = str(bag.resolve())
-    monkeypatch.setattr("src.api.bags.indexing_status", {resolved: "error"})
-    monkeypatch.setattr("src.api.bags.indexing_errors", {resolved: "boom while extracting"})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_status", {resolved: "error"})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_errors", {resolved: "boom while extracting"})
 
     resp = _client(bypass_auth).get("/api/bags/status", params={"bag_path": resolved})
 
@@ -32,8 +32,8 @@ def test_status_error_message_is_null_when_clean(tmp_path, bypass_auth, monkeypa
     bag = tmp_path / "ok_bag"
     bag.mkdir()
     resolved = str(bag.resolve())
-    monkeypatch.setattr("src.api.bags.indexing_status", {})
-    monkeypatch.setattr("src.api.bags.indexing_errors", {})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_status", {})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_errors", {})
 
     resp = _client(bypass_auth).get("/api/bags/status", params={"bag_path": resolved})
 
@@ -46,8 +46,8 @@ def test_scan_includes_error_message_per_bag(tmp_path, bypass_auth, monkeypatch)
     bag.mkdir()
     (bag / "rec.mcap").write_bytes(b"")
     resolved = str(bag.resolve())
-    monkeypatch.setattr("src.api.bags.indexing_status", {resolved: "error"})
-    monkeypatch.setattr("src.api.bags.indexing_errors", {resolved: "kaput"})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_status", {resolved: "error"})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_errors", {resolved: "kaput"})
 
     resp = _client(bypass_auth).get("/api/bags/scan", params={"root_dir": str(tmp_path)})
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 from fastapi import FastAPI
 
-from src.auth.dependencies import require_current_user
-from src.auth.models import User
+from chat2bag.auth.dependencies import require_current_user
+from chat2bag.auth.models import User
 
 
 _FAKE_USER = User(id=1, username="test-user", is_active=True)

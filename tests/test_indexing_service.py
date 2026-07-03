@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest
-from src.core.storage import artifacts_for_bag
-from src.services.indexing_service import IndexingService
+from chat2bag.core.storage import artifacts_for_bag
+from chat2bag.services.indexing_service import IndexingService
 
 
 # ---------------------------------------------------------------------------

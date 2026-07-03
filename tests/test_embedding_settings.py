@@ -1,7 +1,7 @@
 from data_extraction_lib.embedding import EmbeddingSettings
 
-from src.core.app_config import get_app_config
-from src.core.embedding_settings import embedding_settings_from_config
+from chat2bag.core.app_config import get_app_config
+from chat2bag.core.embedding_settings import embedding_settings_from_config
 
 
 def test_bridge_maps_all_appconfig_fields():

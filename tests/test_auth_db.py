@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.auth.db import (
+from chat2bag.auth.db import (
     create_user,
     ensure_db_initialized,
     get_user_by_username,
@@ -61,7 +61,7 @@ async def test_update_password_changes_hash(db_path):
     await create_user(username="alice", hashed_password="old")
     await update_password("alice", hashed_password="new")
     # Read the raw stored hash via a test helper
-    from src.auth.db import _fetch_hashed_password
+    from chat2bag.auth.db import _fetch_hashed_password
     assert await _fetch_hashed_password("alice") == "new"
 
 

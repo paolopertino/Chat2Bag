@@ -1,4 +1,4 @@
-import src.core.app_config as app_config_mod
+import chat2bag.core.app_config as app_config_mod
 
 
 _FAKE_SETTINGS = {

@@ -3,7 +3,7 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api import bags_router
+from chat2bag.api import bags_router
 from data_extraction_lib.artifacts import BagArtifacts, EmbedderStamp, IndexManifest
 
 
@@ -15,8 +15,8 @@ def _client(bypass_auth):
 
 
 def _clear_stores(monkeypatch):
-    monkeypatch.setattr("src.api.bags.indexing_status", {})
-    monkeypatch.setattr("src.api.bags.indexing_errors", {})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_status", {})
+    monkeypatch.setattr("chat2bag.api.bags.indexing_errors", {})
 
 
 def test_scan_is_indexed_reflects_manifest_not_lancedb(tmp_path, bypass_auth, monkeypatch):

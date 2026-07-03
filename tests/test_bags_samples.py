@@ -3,8 +3,8 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.bags import router as bags_router
-from src.core.storage import artifacts_for_bag
+from chat2bag.api.bags import router as bags_router
+from chat2bag.core.storage import artifacts_for_bag
 
 
 def _client(bypass_auth):

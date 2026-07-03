@@ -10,10 +10,10 @@ from data_extraction_lib.artifacts import BagArtifacts
 from data_extraction_lib.artifacts.frame_entry import Coordinate, MetadataFrameEntry
 from data_extraction_lib.index import SearchResult
 
-from src.api.dependencies import get_region_search_service
-from src.api.search_routes import router as search_router
-from src.core.app_config import get_app_config
-from src.services.region_search_service import RegionSearchService
+from chat2bag.api.dependencies import get_region_search_service
+from chat2bag.api.search_routes import router as search_router
+from chat2bag.core.app_config import get_app_config
+from chat2bag.services.region_search_service import RegionSearchService
 
 
 def _client_with_stub(bypass_auth, stub):

@@ -2,10 +2,10 @@ import pytest
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
-from src.auth.dependencies import require_current_user
-from src.auth.db import create_user, ensure_db_initialized, set_user_active
-from src.auth.hashing import hash_password
-from src.auth.tokens import create_access_token
+from chat2bag.auth.dependencies import require_current_user
+from chat2bag.auth.db import create_user, ensure_db_initialized, set_user_active
+from chat2bag.auth.hashing import hash_password
+from chat2bag.auth.tokens import create_access_token
 
 
 @pytest.fixture

@@ -6,8 +6,8 @@ from PIL import Image
 from data_extraction_lib.embedding import FrameEmbedder
 from data_extraction_lib.index import BagIndexBuilder, DenseSearch, GlobalSearch
 
-from src.core.app_config import get_app_config
-from src.services.component_factory import BackendComponentFactory
+from chat2bag.core.app_config import get_app_config
+from chat2bag.services.component_factory import BackendComponentFactory
 
 
 class _FakeEmbedder(FrameEmbedder):

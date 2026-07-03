@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.image import router as image_router
+from chat2bag.api.image import router as image_router
 
 
 def _client(bypass_auth):

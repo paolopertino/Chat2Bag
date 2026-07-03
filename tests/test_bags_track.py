@@ -3,9 +3,9 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.bags import router as bags_router
-from src.core.app_config import get_app_config
-from src.core.storage import artifacts_for_bag
+from chat2bag.api.bags import router as bags_router
+from chat2bag.core.app_config import get_app_config
+from chat2bag.core.storage import artifacts_for_bag
 
 
 def _bag(tmp_path):

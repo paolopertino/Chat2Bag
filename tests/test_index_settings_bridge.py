@@ -1,7 +1,7 @@
 from data_extraction_lib.index import IndexSettings
 
-from src.core.app_config import get_app_config
-from src.core.index_settings import index_settings_from_config
+from chat2bag.core.app_config import get_app_config
+from chat2bag.core.index_settings import index_settings_from_config
 
 
 def test_maps_region_config_to_index_settings():

@@ -1,4 +1,4 @@
-from src.auth.hashing import hash_password, verify_password
+from chat2bag.auth.hashing import hash_password, verify_password
 
 
 def test_hash_password_returns_non_empty_string():

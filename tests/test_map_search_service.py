@@ -2,9 +2,9 @@ import dataclasses
 from pathlib import Path
 
 from data_extraction_lib.artifacts import Metadata
-from src.core.app_config import get_app_config
-from src.core.storage import artifacts_for_bag
-from src.services.map_search_service import MapSearchService
+from chat2bag.core.app_config import get_app_config
+from chat2bag.core.storage import artifacts_for_bag
+from chat2bag.services.map_search_service import MapSearchService
 
 
 def _frame(ts: int, topic: str, fp: str, lat: float, lon: float) -> dict:

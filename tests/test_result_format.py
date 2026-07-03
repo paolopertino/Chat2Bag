@@ -15,7 +15,7 @@ from data_extraction_lib.artifacts import BagArtifacts, MetadataFrameEntry
 from data_extraction_lib.geo import Coordinate
 from data_extraction_lib.index import SearchResult
 
-from src.services.result_format import to_response
+from chat2bag.services.result_format import to_response
 
 
 ARTIFACT_DIR = Path("/bags/mybag/.bag_chat")

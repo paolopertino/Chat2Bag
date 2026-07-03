@@ -2,11 +2,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.bags import router as bags_router
-from src.api.datasets import router as datasets_router
-from src.api.image import router as image_router
-from src.api.indexing import router as indexing_router
-from src.api.search_routes import router as search_router
+from chat2bag.api.bags import router as bags_router
+from chat2bag.api.datasets import router as datasets_router
+from chat2bag.api.image import router as image_router
+from chat2bag.api.indexing import router as indexing_router
+from chat2bag.api.search_routes import router as search_router
 
 
 @pytest.fixture

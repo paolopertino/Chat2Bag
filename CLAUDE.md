@@ -7,9 +7,9 @@
 
 ## Architecture
 
-Entry point: `app.py` (FastAPI with lifespan events for model loading/cleanup).
+Entry point: `backend/src/chat2bag/main.py` as `chat2bag.main:app` (FastAPI with lifespan events for model loading/cleanup).
 
-Source is organized under `src/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), `retriever/` (vector search), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
+Source is organized under `backend/src/chat2bag/` with `api/` (routers), `auth/` (JWT auth + SQLite user store), `services/` (business logic), `ingestion/` (bag parsing + LanceDB index building), and `core/` (config, storage paths, schema versions). Built frontend assets live in `static/` (not committed; produced by `npm run build`).
 
 **Key patterns**:
 - Component Factory: `BackendComponentFactory` creates BagParser, Indexer, GlobalSearcher with shared models
@@ -99,15 +99,15 @@ Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single groupe
 |---------|---------|
 | `uv sync` | Install Python dependencies from lockfile |
 | `source .venv/bin/activate` | Activate virtual environment |
-| `uv run uvicorn app:app --reload` | Start backend + serve pre-built frontend from `static/` (port 8000) |
+| `uv run uvicorn chat2bag.main:app --reload` | Start backend + serve pre-built frontend from `static/` (port 8000) |
 | `cd frontend && npm install` | Install frontend dependencies |
 | `cd frontend && npm run dev` | Start Vite dev server (port 5173, proxies `/api` to 8000) — use for frontend hot-reload |
 | `cd frontend && npm run build` | Build frontend to `../static/` (required before uvicorn serves the UI) |
 | `cd frontend && npm run lint` | Run ESLint (typescript-eslint + react-hooks + react-refresh; no Prettier) |
 | `PYTHONPATH="" uv run pytest tests/` | Run all backend tests (empty `PYTHONPATH` is required — the host's ROS2 env leaks `/opt/ros/*` onto `sys.path` and breaks pytest plugin discovery) |
-| `JWT_SECRET=<s> REFRESH_SECRET=<r> uv run python scripts/manage_users.py add-user <name>` | Admin-only CLI to create/list/delete/reset users (no self-signup endpoint) |
+| `JWT_SECRET=<s> REFRESH_SECRET=<r> uv run python backend/scripts/manage_users.py add-user <name>` | Admin-only CLI to create/list/delete/reset users (no self-signup endpoint) |
 
-**Typical local workflow**: `npm run build` once, then `JWT_SECRET=<s> REFRESH_SECRET=<r> uv run uvicorn app:app --reload` to serve everything at http://localhost:8000. The two env vars are required — without them the auth module refuses to issue tokens. Default `AUTH_DB_PATH` is `data/users.db` (repo-relative). For active frontend development, run uvicorn + `npm run dev` concurrently and use http://localhost:5173 instead.
+**Typical local workflow**: `npm run build` once, then `JWT_SECRET=<s> REFRESH_SECRET=<r> uv run uvicorn chat2bag.main:app --reload` to serve everything at http://localhost:8000. The two env vars are required — without them the auth module refuses to issue tokens. Default `AUTH_DB_PATH` is `data/users.db` (repo-relative). For active frontend development, run uvicorn + `npm run dev` concurrently and use http://localhost:5173 instead.
 
 ## Key Configuration (config/settings.yaml)
 

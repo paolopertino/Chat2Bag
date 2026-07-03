@@ -6,7 +6,7 @@ import sys
 
 def _run_cli(args: list[str], env: dict, stdin: str = "") -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "scripts/manage_users.py", *args],
+        [sys.executable, "backend/scripts/manage_users.py", *args],
         input=stdin,
         capture_output=True,
         text=True,
@@ -52,7 +52,7 @@ def test_reset_password_changes_hash(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTH_DB_PATH", str(tmp_path / "users.db"))
     env = {**os.environ, "AUTH_DB_PATH": str(tmp_path / "users.db"), "PYTHONPATH": ""}
 
-    from src.auth.db import _fetch_hashed_password, ensure_db_initialized
+    from chat2bag.auth.db import _fetch_hashed_password, ensure_db_initialized
 
     asyncio.run(ensure_db_initialized())
     _run_cli(["add-user", "alice"], env=env, stdin="old\nold\n")

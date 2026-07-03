@@ -8,8 +8,8 @@ from data_extraction_lib.ros2.records import (
     TimestampedCoordinate,
 )
 
-from src.core.app_config import get_app_config
-from src.ingestion.extraction import result_to_metadata
+from chat2bag.core.app_config import get_app_config
+from chat2bag.ingestion.extraction import result_to_metadata
 
 
 def _config():
@@ -76,7 +76,7 @@ def test_bag_extractor_end_to_end_writes_metadata(tmp_path, monkeypatch):
     import data_extraction_lib.ros2.reader as reader_mod
     import data_extraction_lib.ros2.converters.image as convert_mod
     import data_extraction_lib.ros2.sink.image as sink_mod
-    from src.ingestion.extraction import BagExtractor
+    from chat2bag.ingestion.extraction import BagExtractor
 
     base = get_app_config()
     cam = base.ingestion.camera_topics[0]
