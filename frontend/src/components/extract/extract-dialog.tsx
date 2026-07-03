@@ -56,6 +56,7 @@ export function ExtractDialog({
   const [scalars, setScalars] = useState<Record<string, unknown>>({});
   const [topicState, setTopicState] = useState<TopicSelectionState>(EMPTY_TOPIC_STATE);
   const [outputFolder, setOutputFolder] = useState("");
+  const [sourcePath, setSourcePath] = useState(bagPath);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -69,6 +70,7 @@ export function ExtractDialog({
     setEndNs(w.endNs);
     setSection("window");
     setOutputFolder("");
+    setSourcePath(bagPath);
     if (schema) {
       const { scalars: s, topicState: ts } = hydrate(schema, loadStore());
       setScalars(s);
@@ -95,12 +97,13 @@ export function ExtractDialog({
   const lengthS = useMemo(() => windowLengthS({ startNs, endNs }), [startNs, endNs]);
   const available = schema?.enabled ?? false;
   const windowValid = mode === "full" || endNs > startNs;
+  const bagPathValid = sourcePath.trim().length > 0;
   const topicVal = useMemo(() => validateTopics(topicState), [topicState]);
   const scalarFields = useMemo(
     () => (schema ? schema.editable_fields.filter((f) => f !== "topics") : []),
     [schema],
   );
-  const canSubmit = available && windowValid && topicVal.ok && !submitting;
+  const canSubmit = available && bagPathValid && windowValid && topicVal.ok && !submitting;
 
   if (!open) return null;
 
@@ -132,7 +135,7 @@ export function ExtractDialog({
     setSubmitting(true);
     try {
       await submitExtraction({
-        bag_path: bagPath,
+        bag_path: sourcePath.trim(),
         mode,
         user_config: { ...scalars, topics: assembleTopics(topicState) },
         output_folder: outputFolder.trim() || undefined,
@@ -214,6 +217,19 @@ export function ExtractDialog({
             <div className="min-w-0 flex-1 overflow-y-auto p-4">
               {section === "window" ? (
                 <div>
+                  <label className="mb-3 block text-xs">
+                    <span className="opacity-70">Source bag path</span>
+                    <input
+                      className="mt-1 w-full rounded border border-[var(--line)] bg-transparent px-2 py-1 font-mono text-[11px]"
+                      value={sourcePath}
+                      onChange={(e) => setSourcePath(e.target.value)}
+                      placeholder="/path/to/bag"
+                      spellCheck={false}
+                    />
+                    <span className="mt-0.5 block text-[10px] opacity-40">
+                      Path sent to the extraction service for this bag.
+                    </span>
+                  </label>
                   <div className="mb-3 flex rounded border border-[var(--line)] p-0.5 text-xs">
                     {(["window", "full"] as Mode[]).map((m) => (
                       <button
@@ -323,11 +339,13 @@ export function ExtractDialog({
               title={
                 !available
                   ? "Extraction service is not available"
-                  : !windowValid
-                    ? "Window length must be greater than zero"
-                    : !topicVal.ok
-                      ? topicVal.error
-                      : undefined
+                  : !bagPathValid
+                    ? "Source bag path cannot be empty"
+                    : !windowValid
+                      ? "Window length must be greater than zero"
+                      : !topicVal.ok
+                        ? topicVal.error
+                        : undefined
               }
             >
               {submitting ? "submitting…" : mode === "window" ? "Extract window" : "Extract full bag"}

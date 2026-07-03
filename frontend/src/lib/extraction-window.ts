@@ -4,7 +4,6 @@ export interface NsWindow {
 }
 
 export const DEFAULT_WINDOW_S = 10;
-export const SEED_HALF_SPAN_S = 5;
 
 const NS_PER_S = 1e9;
 const NS_PER_MS = 1e6;
@@ -23,16 +22,6 @@ export function clampWindow(w: NsWindow, firstNs: number, lastNs: number): NsWin
   const startNs = clampNs(w.startNs, firstNs, lastNs);
   const endNs = clampNs(Math.max(w.endNs, startNs), firstNs, lastNs);
   return { startNs, endNs };
-}
-
-export function seedWindow(
-  centerNs: number,
-  halfSpanS: number,
-  firstNs: number,
-  lastNs: number,
-): NsWindow {
-  const half = halfSpanS * NS_PER_S;
-  return clampWindow({ startNs: centerNs - half, endNs: centerNs + half }, firstNs, lastNs);
 }
 
 // Returns a new endNs keeping startNs fixed, clamped so end stays within the bag and >= start.

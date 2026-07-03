@@ -14,7 +14,7 @@ import { useHeatmaps } from "../hooks/use-heatmaps";
 import { useOmniboxSearch } from "../hooks/use-omnibox-search";
 import { useSampleBrowser } from "../hooks/use-sample-browser";
 import { decodeBagId } from "../lib/bag-id";
-import { SEED_HALF_SPAN_S, formatWindowTime, seedWindow, windowLengthS } from "../lib/extraction-window";
+import { DEFAULT_WINDOW_S, clampWindow, formatWindowTime, windowLengthS } from "../lib/extraction-window";
 import { framesFromSample } from "../lib/region-support";
 
 export function BagViewerPage() {
@@ -146,7 +146,13 @@ export function BagViewerPage() {
             onClick={() => {
               if (!bagRange) return;
               const center = browser.activeSample?.timestamp_ns ?? bagRange.first;
-              setDraftWindow(seedWindow(center, SEED_HALF_SPAN_S, bagRange.first, bagRange.last));
+              setDraftWindow(
+                clampWindow(
+                  { startNs: center, endNs: center + DEFAULT_WINDOW_S * 1e9 },
+                  bagRange.first,
+                  bagRange.last,
+                ),
+              );
               setSelectMode(true);
             }}
           >
