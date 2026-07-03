@@ -11,7 +11,7 @@ ingestion:
 
 storage:
   artifact_dir: ".bag_chat"                                                                 # The name of the hidden artifact folder created to store app data.
-  storage_path: null                                                                        # Optional path to store the artifact directory. If null, it defaults to the indexed bag directory.
+  storage_path: null                                                                        # Optional path to store the artifact directory. If null, it defaults to the indexed bag directory. Overridable via CHAT2BAG_STORAGE_PATH (empty string => null).
 
 embedding:
   backend: "tipsv2"                                                                         # Registry key: siglip2 | tipsv2
@@ -52,7 +52,7 @@ api:
   scan_timeout_sec: 30.0                                                                      # Maximum seconds allowed for a recursive bag directory scan before returning 504.
 
 extraction:
-  service_url: http://localhost:8765                                                                          # URL of the dataset-generation microservice. Set to null to disable the feature entirely.
+  service_url: http://localhost:8765                                                                          # URL of the dataset-generation microservice. Set to null to disable the feature entirely. Overridable via EXTRACTION_SERVICE_URL (empty string => disabled); use the Compose service name (e.g. http://dataset-generation:8765) inside containers.
   request_timeout_sec: 10.0                                                                   # Timeout (seconds) for requests to the extraction microservice.
   default_output_subdir: "nuscenes_extractions"                                               # Subdirectory (under each bag's artifact dir) where NuScenes datasets are written.
   # Fields the user can edit in the UI. All other fields are either inherited from the
@@ -67,6 +67,7 @@ extraction:
     - topics
   # Strip this prefix from bag paths before forwarding to the microservice.
   # Useful when the service runs in Docker with a different mount point (e.g. /adehome → /).
+  # Overridable via EXTRACTION_PATH_STRIP_PREFIX (empty string => no stripping, for identical cross-container mounts).
   path_strip_prefix: "/adehome"
   # Values injected server-side on every extraction request. Users cannot override these.
   fixed_overrides:

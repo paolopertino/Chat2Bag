@@ -91,7 +91,13 @@ Map-home UI improvements (2026-06-16, `feat/frontend-refactor`): a single groupe
 ### Configuration
 - Settings: `config/settings.yaml` (ingestion, storage, models)
 - Logging: `config/logging.yaml`
-- Environment variable: `CORS_ORIGINS` (comma-separated allowed origins)
+- Environment variables:
+  - `CORS_ORIGINS` — comma-separated allowed origins
+  - `JWT_SECRET`, `REFRESH_SECRET` — required for the auth module to issue tokens
+  - `AUTH_DB_PATH` — user store location (default `data/users.db`)
+  - `EXTRACTION_SERVICE_URL` — overrides `extraction.service_url`; empty string disables extraction. Use the Compose service name (e.g. `http://dataset-generation:8765`) inside containers.
+  - `EXTRACTION_PATH_STRIP_PREFIX` — overrides `extraction.path_strip_prefix`; empty string disables stripping (for identical cross-container mounts)
+  - `CHAT2BAG_STORAGE_PATH` — overrides `storage.storage_path`; empty string falls back to the indexed bag directory
 
 ## Common Commands
 

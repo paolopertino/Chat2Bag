@@ -114,6 +114,66 @@ def test_search_max_concurrent_override_honored(monkeypatch):
         app_config_mod.get_app_config.cache_clear()
 
 
+def test_extraction_env_url_enables_when_settings_null(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_SERVICE_URL", "http://dataset-generation:8765")
+    cfg = app_config_mod._parse_extraction_config({"service_url": None})
+    assert cfg.enabled is True
+    assert cfg.service_url == "http://dataset-generation:8765"
+
+
+def test_extraction_env_url_overrides_settings(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_SERVICE_URL", "http://dataset-generation:8765")
+    cfg = app_config_mod._parse_extraction_config({"service_url": "http://localhost:8765"})
+    assert cfg.service_url == "http://dataset-generation:8765"
+
+
+def test_extraction_env_url_empty_disables(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_SERVICE_URL", "")
+    cfg = app_config_mod._parse_extraction_config({"service_url": "http://localhost:8765"})
+    assert cfg.enabled is False
+    assert cfg.service_url is None
+
+
+def test_extraction_url_unset_uses_settings(monkeypatch):
+    monkeypatch.delenv("EXTRACTION_SERVICE_URL", raising=False)
+    cfg = app_config_mod._parse_extraction_config({"service_url": "http://localhost:8765"})
+    assert cfg.service_url == "http://localhost:8765"
+
+
+def test_extraction_path_strip_prefix_env_override(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_PATH_STRIP_PREFIX", "/mnt/storage")
+    cfg = app_config_mod._parse_extraction_config(
+        {"service_url": "http://localhost:8765", "path_strip_prefix": "/adehome"}
+    )
+    assert cfg.path_strip_prefix == "/mnt/storage"
+
+
+def test_extraction_path_strip_prefix_env_empty_disables_stripping(monkeypatch):
+    monkeypatch.setenv("EXTRACTION_PATH_STRIP_PREFIX", "")
+    cfg = app_config_mod._parse_extraction_config(
+        {"service_url": "http://localhost:8765", "path_strip_prefix": "/adehome"}
+    )
+    assert cfg.path_strip_prefix is None
+
+
+def test_storage_path_env_override(monkeypatch):
+    monkeypatch.setenv("CHAT2BAG_STORAGE_PATH", "/data/artifacts")
+    cfg = app_config_mod._parse_storage_config({"artifact_dir": ".bag_chat", "storage_path": None})
+    assert cfg.storage_path == "/data/artifacts"
+
+
+def test_storage_path_env_empty_is_none(monkeypatch):
+    monkeypatch.setenv("CHAT2BAG_STORAGE_PATH", "")
+    cfg = app_config_mod._parse_storage_config({"artifact_dir": ".bag_chat", "storage_path": "/x"})
+    assert cfg.storage_path is None
+
+
+def test_storage_path_unset_uses_settings(monkeypatch):
+    monkeypatch.delenv("CHAT2BAG_STORAGE_PATH", raising=False)
+    cfg = app_config_mod._parse_storage_config({"artifact_dir": ".bag_chat", "storage_path": "/x"})
+    assert cfg.storage_path == "/x"
+
+
 def test_ingestion_long_side_and_camera_topics_parsed(monkeypatch):
     monkeypatch.setattr(app_config_mod, "get_settings", lambda: _FAKE_SETTINGS)
     app_config_mod.get_app_config.cache_clear()

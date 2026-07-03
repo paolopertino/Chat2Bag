@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
@@ -75,17 +76,41 @@ class AppConfig:
     extraction: ExtractionConfig
 
 
+def _parse_storage_config(raw: Optional[dict]) -> StorageConfig:
+    raw = raw or {}
+    storage_path = raw.get("storage_path")
+    env_storage = os.environ.get("CHAT2BAG_STORAGE_PATH")
+    if env_storage is not None:
+        storage_path = env_storage or None
+    return StorageConfig(
+        artifact_dir=str(raw["artifact_dir"]),
+        storage_path=str(storage_path) if storage_path is not None else None,
+    )
+
+
 def _parse_extraction_config(raw: Optional[dict]) -> ExtractionConfig:
-    if not raw or raw.get("service_url") is None:
+    raw = raw or {}
+
+    service_url = raw.get("service_url")
+    env_url = os.environ.get("EXTRACTION_SERVICE_URL")
+    if env_url is not None:
+        service_url = env_url.strip() or None
+    if service_url is None:
         return ExtractionConfig.disabled()
+
+    path_strip_prefix = raw.get("path_strip_prefix") or None
+    env_prefix = os.environ.get("EXTRACTION_PATH_STRIP_PREFIX")
+    if env_prefix is not None:
+        path_strip_prefix = env_prefix or None
+
     return ExtractionConfig(
         enabled=True,
-        service_url=str(raw["service_url"]),
+        service_url=str(service_url),
         request_timeout_sec=float(raw.get("request_timeout_sec", 10.0)),
         default_output_subdir=str(raw.get("default_output_subdir", "nuscenes_extractions")),
         editable_fields=tuple(raw.get("editable_fields", [])),
         fixed_overrides=dict(raw.get("fixed_overrides") or {}),
-        path_strip_prefix=str(raw["path_strip_prefix"]) if raw.get("path_strip_prefix") else None,
+        path_strip_prefix=str(path_strip_prefix) if path_strip_prefix else None,
     )
 
 
@@ -144,10 +169,7 @@ def get_app_config() -> AppConfig:
             ),
             gps_max_gap_sec=float(settings["ingestion"].get("gps_max_gap_sec", 1.0)),
         ),
-        storage=StorageConfig(
-            artifact_dir=str(settings["storage"]["artifact_dir"]),
-            storage_path=str(settings["storage"]["storage_path"]) if settings["storage"]["storage_path"] is not None else None
-        ),
+        storage=_parse_storage_config(settings.get("storage")),
         models=ModelsConfig(
             model_storage=str(settings["models"]["model_storage"]),
         ),
